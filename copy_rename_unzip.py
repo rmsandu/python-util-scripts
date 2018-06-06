@@ -12,7 +12,7 @@ from splitAllPaths import splitall as split_paths
 # TODO 2. rename folder
 # TODO 3. move Study0 to root folder
 # TODO 4. unzip folders
-# TODO 5 . convert to cmd line script . Input: rootdir
+# TODO 5 . convert to cmd line script . Input: [1] src directory [2]
 # TODO 6. remove the German umlauts and the French umlauts from the names
 
 def copytree(src, dst, symlinks=False, ignore=None):
@@ -24,19 +24,24 @@ def copytree(src, dst, symlinks=False, ignore=None):
         else:
             shutil.copy2(s, d)
 #%%
-rootdir = r"C:\develop\data\PATS"
+src_dir = r"C:\develop\data\PATS" # source directory from where to copy the folders/files
+dst_dir = r"C:\develop\data\TEST_DIR" # destination directory to where copy folders/files
 
-dictionary_filepaths = {}
-# the filepaths are already saved in a CSV
-for dirs in os.listdir(rootdir):
-    if not os.path.isdir(os.path.join(rootdir, dirs)):
-         continue # Not a directory
-    if "Pat" in dirs:
-        # rename folder
-        os.rename(os.path.join(rootdir,dirs),
-                  os.path.join(rootdir, dirs[dirs.find('Pat'):]))
 #%%
-for path, dirs, files in os.walk(rootdir):
+# copy and rename all patient folders from src_dir to dest_dir
+for dirs in os.listdir(src_dir):
+    if not os.path.isdir(os.path.join(src_dir, dirs)):
+        continue
+    else:
+        # copy to destination folder
+        copytree(os.path.join(src_dir, dirs),dst_dir)
+        if "Pat" in dirs:
+        # rename folder
+            os.rename(os.path.join(dst_dir,dirs),
+                      os.path.join(dst_dir, dirs[dirs.find('Pat'):]))
+        
+#%% Move Study to Root folder and Unzip XML Recordings
+for path, dirs, files in os.walk(src_dir):
     index_ir = [i for i, s in enumerate(dirs) if 'IR Data' in s]
     index_xml = [i for i, s in enumerate(dirs) if 'XML' in s]
     if index_ir:
@@ -44,7 +49,7 @@ for path, dirs, files in os.walk(rootdir):
         src = os.path.join(path,ir_data_dir)
         all_folders = split_paths(src)
         index = [i for i, s in enumerate(all_folders) if 'Pat' in s]
-        dst = os.path.join(rootdir, all_folders[index[0]])
+        dst = os.path.join(src_dir, all_folders[index[0]])
         copytree(src,dst)
     if index_xml:
         xml_dir = dirs[index_xml[0]]
@@ -57,3 +62,13 @@ for path, dirs, files in os.walk(rootdir):
                 with zipfile.ZipFile(zip_filepath,"r") as zip_ref:
                     zip_ref.extractall(os.path.join(xml_dir,filename))
                     zip_ref.close()
+                    
+#%%
+# RENAME folders 
+for dirs in os.listdir(src_dir):
+    if not os.path.isdir(os.path.join(src_dir, dirs)):
+         continue # Not a directory
+    if "Pat" in dirs:
+        # rename folder
+        os.rename(os.path.join(src_dir,dirs),
+                  os.path.join(src_dir, dirs[dirs.find('Pat'):]))
