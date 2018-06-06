@@ -6,12 +6,14 @@ Created on Wed Jun  6 10:10:24 2018
 """
 import os
 import shutil
+import zipfile
 from splitAllPaths import splitall as split_paths
 # TODO: 1. copy/paste folders from folder dir to another one
 # TODO 2. rename folder
 # TODO 3. move Study0 to root folder
 # TODO 4. unzip folders
 # TODO 5 . convert to cmd line script . Input: rootdir
+# TODO 6. remove the German umlauts and the French umlauts from the names
 
 def copytree(src, dst, symlinks=False, ignore=None):
     for item in os.listdir(src):
@@ -33,20 +35,25 @@ for dirs in os.listdir(rootdir):
         # rename folder
         os.rename(os.path.join(rootdir,dirs),
                   os.path.join(rootdir, dirs[dirs.find('Pat'):]))
- 
 #%%
 for path, dirs, files in os.walk(rootdir):
-    index = [i for i, s in enumerate(dirs) if 'IR Data' in s]
-    if index:
-        ir_data_dir = dirs[index[0]]
+    index_ir = [i for i, s in enumerate(dirs) if 'IR Data' in s]
+    index_xml = [i for i, s in enumerate(dirs) if 'XML' in s]
+    if index_ir:
+        ir_data_dir = dirs[index_ir[0]]
         src = os.path.join(path,ir_data_dir)
         all_folders = split_paths(src)
         index = [i for i, s in enumerate(all_folders) if 'Pat' in s]
         dst = os.path.join(rootdir, all_folders[index[0]])
         copytree(src,dst)
-# Move study 0
-# unzip
-
-#    print(files)
-#    if not os.path.isdir(os.path.join(basedir, fn)):
-#    continue # Not a directory
+    if index_xml:
+        xml_dir = dirs[index_xml[0]]
+        xml_dir = os.path.join(path, xml_dir)
+        for file in os.listdir(xml_dir):
+            if file.endswith(".zip"):
+                filename, file_extension = os.path.splitext(file)
+                # unzip file xml recordings
+                zip_filepath = os.path.join(xml_dir,file)
+                with zipfile.ZipFile(zip_filepath,"r") as zip_ref:
+                    zip_ref.extractall(os.path.join(xml_dir,filename))
+                    zip_ref.close()
