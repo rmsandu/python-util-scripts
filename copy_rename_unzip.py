@@ -80,6 +80,7 @@ def move_unzip(dst_dir, keyword):
         index_xml = [i for i, s in enumerate(dirs) if 'XML' in s]
         if index_ir:
             # move Study folder to root patient folder
+            # TODO: only if necesary!! condition needed
             ir_data_dir = dirs[index_ir[0]]
             src = os.path.join(path, ir_data_dir)
             all_folders = split_paths(src)
@@ -98,6 +99,7 @@ def move_unzip(dst_dir, keyword):
                     with zipfile.ZipFile(zip_filepath, "r") as zip_ref:
                         zip_ref.extractall(os.path.join(xml_dir, filename))
                         zip_ref.close()
+    print("Done! All files and folders copied and renamed")
 
 
 if __name__ == '__main__':
