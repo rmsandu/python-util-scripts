@@ -5,7 +5,7 @@
 - util for modifying DICOM Tags
 
 The snippets package contains the following modules:
-
+* `anonymization_dicom` -- simple script using pydicom to remove the patient's id, name and study institution from DICOM Images
 * `readInputKeyboard` -- getting user input for modular scripts
 * `casxmlreader` -- reading XML Cas Logs for data extraction
 * `Tiff2Nii` -- parse MEVIS TIff Image Files to NIfTI format https://nifti.nimh.nih.gov/nifti-1/
