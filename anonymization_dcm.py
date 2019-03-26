@@ -1,3 +1,4 @@
+import os
 import glob
 import pydicom
 import readInputKeyboard
@@ -13,16 +14,23 @@ import readInputKeyboard
 # give folder patient name and parse through all files folders
 # seg_files = glob.glob('C:\\Pat_MAV_GRON_G01\\*')
 
+rootdir = r""
 
 seg_files = glob.glob(r"\*")
 
+for subdir, dirs, files in os.walk(rootdir):
+    for file in sorted(files):  # sort files by date of creation
 
+        fileName, fileExtension = os.path.splitext(file)
+        if fileExtension.lower().endswith('.dcm'):
+            xmlFilePathName = os.path.join(subdir, file)
+            sef_file = os.path.normpath(xmlFilePathName)
 
-for seg_nr, seg_file in enumerate(seg_files):
-    dataset = pydicom.read_file(seg_file)
-    dataset.PatientName = "GRON-001-G01"
-    dataset.PatientID = "G01"
-    dataset.PatientBirthDate = "19540101"
+# for seg_nr, seg_file in enumerate(seg_files):
+        dataset = pydicom.read_file(seg_file)
+        dataset.PatientName = "GRON-001-G01"
+        dataset.PatientID = "G01"
+        dataset.PatientBirthDate = "19540101"
     # dataset.InstanceNumber = seg_nr
     # dataset.ImageType = ['DERIVED', 'SECONDARY', 'AXIAL', 'CT_SOM5 SPI']
     # dataset.SeriesInstanceUID = "1.2.840.113564.9.1.2792465697.55.2.5008512924"
