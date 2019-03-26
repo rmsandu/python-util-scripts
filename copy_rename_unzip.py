@@ -33,6 +33,7 @@ def copytree(src, dst, symlinks=False, ignore=None):
 def copy_rename(src_dir, dst_dir, keyword):
     """
     Copy all patient folders from src_dir to dest_dir and save the filenames to Excel
+    Removes the trailing numbers at the beginning of the file folder
     :param src_dir: [string]. source directory where the files are
     :param dst_dir: [string]. destination directory where the files will be copied
     :param keyword: [string]. here keyword = "Pat". a repeating keyword to identify main patient folder
@@ -47,6 +48,7 @@ def copy_rename(src_dir, dst_dir, keyword):
         if not os.path.isdir(os.path.join(dst_dir, dirs)):
             continue
         else:
+            # if any of the patient names has been found
             if keyword in dirs:
                 # save filenames and filepaths to dict
                 pat_folder_name = dirs[dirs.find(keyword):]
@@ -54,19 +56,19 @@ def copy_rename(src_dir, dst_dir, keyword):
                 pat_counter += 1
                 patient_info = {"PatientID": pat_counter,
                                 "Patient Folder Name": pat_folder_name,
-                                "Filepath to Patient Folder": pat_filepath,
-                                "Segmentation done by": '',
-                                "Segmentation Date": ''}
+                                "Filepath to Patient Folder": pat_filepath
+                                }
                 dict_filenames.append(patient_info)
                 # rename folder
                 os.rename(os.path.join(dst_dir, dirs),
                           os.path.join(dst_dir, dirs[dirs.find(keyword):]))
     # write to dataframe
     df_filenames = pd.DataFrame(dict_filenames)
-    filename = 'Segmentations_Info_' + '.xlsx'
+    filename = 'PatientDatasets_PathInfo_' + '.xlsx'
     filepath_excel = os.path.join(dst_dir, filename)
     writer = pd.ExcelWriter(filepath_excel)
     df_filenames.to_excel(writer, index=False)
+    writer.save()
 
 
 def move_unzip(dst_dir, keyword):
@@ -102,19 +104,28 @@ def move_unzip(dst_dir, keyword):
     print("Done! All files and folders copied and renamed")
 
 
-if __name__ == '__main__':
-    if len(sys.argv) < 4:
-        print(" To few arguments, please specify a source directory, a destination directory and a keyword for every"
-              " patients folder name ")
-        exit()
-    else:
-        source_directory = os.path.normpath(sys.argv[1])
-        print("Source Directory:", source_directory)
-        destination_directory = os.path.normpath(sys.argv[2])
-        print("Destination Directory:", destination_directory)
-        keyword_folder_name = sys.argv[3]
-        print("Keyword for Patient Folder: ", keyword_folder_name)
-        copy_rename(source_directory, destination_directory, keyword_folder_name)
-        move_unzip(destination_directory, keyword_folder_name)
+# if __name__ == '__main__':
+#     print("W")
+#     if len(sys.argv) < 4:
+#         print(" To few arguments, please specify a source directory, a destination directory and a keyword for every"
+#               " patients folder name. Please specify keyword [keyword(string), keyword(string)] ")
+#         exit()
+#     else:
+source_directory = r"C:\Patients_Cochlea\Datasets"
+# source_directory = os.path.normpath(sys.argv[1])
+print("Source Directory:", source_directory)
+# destination_directory = os.path.normpath(sys.argv[2])
+destination_directory = r"C:\Patients_Cochlea\Datsets_Fabrice_processed"
+print("Destination Directory:", destination_directory)
+# keywords = sys.argv[3]
+keywords = ["Pat_"]
+print("Keyword for Patient Folder(s): ", keywords)
+# look for the keywords in a list of folder.
+# if keyword is "Pat" it selects all patients
+# if keyword is "Pat_JohnSmith" it looks for patient John Smith
+# if a list of keywords has been proided (as in list of patient names) it searches for each of them
+for keyword_folder_name in keywords:
+    # copy_rename(source_directory, destination_directory, keyword_folder_name)
+    move_unzip(destination_directory, keyword_folder_name)
 #   src_dir = "C:\develop\data\PATS" # source directory from where to copy the folders/files
 #   dst_dir = "C:\develop\data\TEST_DIR" # destination directory to where copy folders/files
