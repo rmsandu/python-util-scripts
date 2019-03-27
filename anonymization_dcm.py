@@ -1,3 +1,4 @@
+import argparse
 import os
 import glob
 import pydicom
@@ -13,24 +14,45 @@ import readInputKeyboard
 # folder = ''
 # give folder patient name and parse through all files folders
 # seg_files = glob.glob('C:\\Pat_MAV_GRON_G01\\*')
+ap = argparse.ArgumentParser()
+ap.add_argument("-r", "--rootdir", required=True, help="Insert Patient Folder Root Directory")
+ap.add_argument("-i", "--patient_id", required=True, help="New Patient ID")
+ap.add_argument("-n", "--patient_name", required=True, help="New Patient Name")
+ap.add_argument("-dob", "--patient_dob", required=True, help="Patient's BirthDate")
+args = vars(ap.parse_args())
+#%%
+# rootdir = os.path.normpath(readInputKeyboard.getNonEmptyString("Root Directory with Patient Folder"))
+# patient_name = readInputKeyboard.getNonEmptyString("New Patient Name ")
+# patient_id = readInputKeyboard.getNonEmptyString("New Patient ID, eg. G01 ")
+# patient_dob = readInputKeyboard.getNonEmptyString("Patient's BirthDate, format eg. 19540101 ")
+#todo: study institution
+#todo: physician's name
+# seg_files = glob.glob(r"\*")
+# patient_id = "G01"
+# patient_dob = "19540101"
 
-rootdir = r""
+rootdir = os.path.normpath(args["rootdir"])
+patient_id = args["patient_id"]
+patient_name = args["patient_name"]
+patient_dob = args["patient_dob"]
 
-seg_files = glob.glob(r"\*")
+
 
 for subdir, dirs, files in os.walk(rootdir):
     for file in sorted(files):  # sort files by date of creation
-
         fileName, fileExtension = os.path.splitext(file)
-        if fileExtension.lower().endswith('.dcm'):
-            xmlFilePathName = os.path.join(subdir, file)
-            sef_file = os.path.normpath(xmlFilePathName)
+        DcmFilePathName = os.path.join(subdir, file)
+        try:
+            dcm_file = os.path.normpath(DcmFilePathName)
+            dataset = pydicom.read_file(dcm_file)
+            dataset.PatientName = patient_name
+            dataset.PatientID = patient_id
+            dataset.PatientBirthDate = patient_dob
+            dataset.save_as(dcm_file)
+        except Exception as e:
+            print(repr(e))
 
-# for seg_nr, seg_file in enumerate(seg_files):
-        dataset = pydicom.read_file(seg_file)
-        dataset.PatientName = "GRON-001-G01"
-        dataset.PatientID = "G01"
-        dataset.PatientBirthDate = "19540101"
+    # for seg_nr, seg_file in enumerate(seg_files):
     # dataset.InstanceNumber = seg_nr
     # dataset.ImageType = ['DERIVED', 'SECONDARY', 'AXIAL', 'CT_SOM5 SPI']
     # dataset.SeriesInstanceUID = "1.2.840.113564.9.1.2792465697.55.2.5008512924"
@@ -42,4 +64,4 @@ for subdir, dirs, files in os.walk(rootdir):
     # dataset.RescaleType = "HU"
     # dataset.AccessionNumber = "6201271.30"
 
-    dataset.save_as(seg_file)
+
