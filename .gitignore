@@ -19,14 +19,12 @@ lib64/
 parts/
 sdist/
 var/
-venv/
-_pycache_/
 wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 .idea/
-MANIFEST
+# MANIFEST
 *.pyc
 
 # PyInstaller
@@ -90,7 +88,6 @@ celerybeat-schedule
 .venv
 env/
 venv/
-venv/Lib/
 ENV/
 env.bak/
 venv.bak/

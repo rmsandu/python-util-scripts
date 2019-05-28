@@ -61,19 +61,58 @@ def getChoiceYesNo(prompt, choices):
         else:
             print("Oops, you did not enter a valid value from the available choices")
 
-def I_parseRecordingXML(filename):
-    xmlobj = ut.parse(filename)
+
+def encode_xml(filename, patient_id, patient_name, patient_dob):
+
     xmlobj = ET.parse(filename)
     root = xmlobj.getroot()
+    try:
+        CT_info = root.findall('CTInfo')
+        root.remove(CT_info)
+        surgery_date = root.findall('SurgeryInfo')
+        root.remove(surgery_date)
+    except Exception as e:
+        pass # elements not found in XML
+    try:
+        # for patient information XML
+        for pat in root.findall('PatientInfo'):
+            pat.set('ID', patient_id)
+            pat.set('Initial', patient_name)
+            pat.set('DOB', patient_dob + '-01-01')
+    except Exception as e:
+        pass  # the xml elements not existent in this XML
+    # Plan and Validation XML
+    try:
+        for pat in root.findall('PatientData'):
+            pat.set('seriesPath', " ")
+            try:
+                pat.set('patientID', patient_id)
+            except Exception as e:
+                pass
+    except Exception as e:
+        pass  # elements not found in XML
+
+    # re-write the XML and save it
+    xmlobj.write()
+
+    # todo: 2. rreplace the patientid, remove the date of birth
+
+    # modify patient id
+    # patient name tag
     # for rank in root.iter():
 
 
 #%%
-rootdir = os.path.normpath(getNonEmptyString("Root Directory FilePath with Patient Folder"))
-patient_name = getNonEmptyString("New Patient Name ")
-patient_id = getNonEmptyString("New Patient ID, eg. G001 ")
-patient_dob = getNonEmptyString("Patient's BirthDate, format eg. 19540101 ")
+# rootdir = os.path.normpath(getNonEmptyString("Root Directory FilePath with Patient Folder"))
+# patient_name = getNonEmptyString("New Patient Name ")
+# patient_id = getNonEmptyString("New Patient ID, eg. G001 ")
+# patient_dob = getNonEmptyString("Patient's BirthDate, format eg. 19540101 ")
 
+
+rootdir = r"C:\MAVERRIC_STOCK_III\Pat_M53"
+patient_name = "MAV-STO-M53"
+patient_id = "MAV-M53"
+patient_dob = ''
 for subdir, dirs, files in os.walk(rootdir):
     for file in sorted(files):  # sort files by date of creation
         fileName, fileExtension = os.path.splitext(file)
@@ -81,12 +120,14 @@ for subdir, dirs, files in os.walk(rootdir):
         if fileExtension.lower().endswith('.xml'):
             xmlFilePathName = os.path.join(subdir, file)
             xmlfilename = os.path.normpath(xmlFilePathName)
+            encode_xml(xmlfilename, patient_id, patient_name, patient_dob)
+
         try:
             dcm_file = os.path.normpath(DcmFilePathName)
             dataset = pydicom.read_file(dcm_file)
             dataset.PatientName = patient_name
             dataset.PatientID = patient_id
-            dataset.PatientBirthDate = patient_dob
+            # dataset.PatientBirthDate = patient_dob
             dataset.InstitutionName = "None"
             dataset.InstitutionAddress = "None"
 
@@ -95,5 +136,5 @@ for subdir, dirs, files in os.walk(rootdir):
             pass
             # print(repr(e))
 
-print("Patient Folder Contents Successfully Anonymized")
-os.system("pause")
+print("Patient Folder Contents Successfully Anonymized:", patient_name)
+# os.system("pause")
