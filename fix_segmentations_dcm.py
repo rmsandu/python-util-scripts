@@ -6,63 +6,11 @@ Created on Tue Feb 07 11:34:48 2019
 """
 import os
 import pydicom
-import sys
+from pydicom import uid
+import readInputKeyboard
 import xml.etree.ElementTree as ET
-
+# from generate_sop_uid_dicom import make_uid
 #%%
-
-
-def getInteger(prompt, mustBePositive=False):
-    v = None
-    while v is None:
-        try:
-            vIn = input(prompt + ':')
-            v = int(vIn)
-            if mustBePositive and v < 1:
-                print("You must enter a POSITIVE number")
-                v = None
-        except ValueError:
-            print("Non integer value given, please enter a valid integer")
-    return v
-
-
-def getNaturalNumber(prompt):
-    return getInteger(prompt, mustBePositive=True)
-
-def getNonEmptyString(prompt):
-    v = None
-    while v is None or len(v) == 0:
-        v = input(prompt + ':').strip()
-    return v
-
-
-def getChoice(prompt, choices):
-    assert (type(choices) == list)
-    choices = list(map(lambda L: L.lower(), choices))
-    clf_name = None
-    while clf_name is None:
-        clf = input(prompt + ' (any of ' + ",".join(choices) + '):').lower()
-        if clf in choices:
-            clf_name = clf
-            return clf_name
-        else:
-            print("Oops, you did not enter a valid value from the available choices")
-
-
-def getChoiceYesNo(prompt, choices):
-    assert (type(choices) == list)
-    choices = list(map(lambda L: L.lower(), choices))
-    clf_name = None
-    while clf_name is None:
-        clf = input(prompt + ' (any of ' + ",".join(choices) + '):').lower()
-        if clf in choices:
-            if clf == 'y':
-                clf_name = True
-            elif clf == 'n':
-                clf_name = False
-            return clf_name
-        else:
-            print("Oops, you did not enter a valid value from the available choices")
 
 
 def encode_xml(filename, patient_id, patient_name, patient_dob):
@@ -72,7 +20,7 @@ def encode_xml(filename, patient_id, patient_name, patient_dob):
     except Exception as e:
         print(repr(e))
         print('This file cannot be parsed: ', filename)
-        sys.exit()
+        return None
 
     root = xmlobj.getroot()
 
@@ -82,7 +30,7 @@ def encode_xml(filename, patient_id, patient_name, patient_dob):
         surgery_date = root.findall('SurgeryInfo')
         root.remove(surgery_date)
     except Exception as e:
-        pass # elements not found in XML
+        pass  # elements not found in XML
     try:
         # for patient information XML
         for pat in root.findall('PatientInfo'):
@@ -105,32 +53,36 @@ def encode_xml(filename, patient_id, patient_name, patient_dob):
     # re-write the XML and save it
     xmlobj.write(filename)
 
-
 #%%
 
-# rootdir = os.path.normpath(getNonEmptyString("Root Directory FilePath with Patient Folder"))
-# patient_name = getNonEmptyString("New Patient Name ")
-# patient_id = getNonEmptyString("New Patient ID, eg. G001 ")
-# patient_dob = getNonEmptyString("Patient's BirthDate, format eg. 19540101 ")
 
 if __name__ == '__main__':
-
+    # rootdir = os.path.normpath(readInputKeyboard.getNonEmptyString("Root Directory FilePath with Patient Folder"))
+    # patient_name = readInputKeyboard.getNonEmptyString("New Patient Name, eg MAV-STO-M06")
+    # patient_id = readInputKeyboard.getNonEmptyString("New Patient ID, eg. MAV-M06 ")
+    # patient_dob = readInputKeyboard.getNonEmptyString("Patient's BirthDate, format eg. 19540101 ")
     rootdir = r"C:\MAVERRIC_STOCK_I\Pat_M6"
     patient_name = "MAV-STO-M06"
     patient_id = "MAV-M06"
     patient_dob = '19600101'
-
+    #%% XML encoding
     for subdir, dirs, files in os.walk(rootdir):
+
         for file in sorted(files):  # sort files by date of creation
             fileName, fileExtension = os.path.splitext(file)
-            DcmFilePathName = os.path.join(subdir, file)
+
             if fileExtension.lower().endswith('.xml'):
                 xmlFilePathName = os.path.join(subdir, file)
                 xmlfilename = os.path.normpath(xmlFilePathName)
                 encode_xml(xmlfilename, patient_id, patient_name, patient_dob)
 
-            try:
-                if dirs[0] == 'Segmentations':
+    #%% DICOM encoding
+    for subdir, dirs, files in os.walk(rootdir):
+        if 'SeriesNo_' and 'Segmentations' in subdir:
+            for file in sorted(files):  # sort files by date of creation
+                DcmFilePathName = os.path.join(subdir, file)
+                try:
+                    k = 1
                     # modify only the segmentation files --> if the files are in the "Segmentations" files
                     # InstanceNumber, SliceLocation, SOPInstanceUID
                     dcm_file = os.path.normpath(DcmFilePathName)
@@ -140,11 +92,17 @@ if __name__ == '__main__':
                     dataset.PatientBirthDate = patient_dob
                     dataset.InstitutionName = "None"
                     dataset.InstitutionAddress = "None"
+                    # dataset.SOPInstanceUID = make_uid()
+                    dataset.SliceLocation = dataset.ImagePositionPatient[2]
+                    dataset.SOPInstanceUID = uid.generate_uid()
+                    dataset.InstanceNumber = k
+                    k += 1
                     dataset.save_as(dcm_file)
-            except Exception as e:
-                pass
-                # print(repr(e))
 
-    print("Patient Folder Contents Successfully Anonymized:", patient_name)
+                except Exception as e:
+                    pass
+                    print(repr(e))
+
+print("Patient Folder Segmentations Fixed:", patient_name)
 
 
