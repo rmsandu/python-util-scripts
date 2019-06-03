@@ -6,6 +6,7 @@ Created on Tue Feb 07 11:34:48 2019
 """
 import os
 import pydicom
+import pandas as pd
 from pydicom import uid
 import readInputKeyboard
 import xml.etree.ElementTree as ET
@@ -75,12 +76,11 @@ if __name__ == '__main__':
     #             encode_xml(xmlfilename, patient_id, patient_name, patient_dob)
 
     #%% DICOM encoding
-
-    # todo: assign correctly the series instance from validation series to ablation segm
     list_all_ct_series = []
     for subdir, dirs, files in os.walk(rootdir):
         # study_0, study_1 case?
-        if 'Series_' in subdir:
+        path, foldername = os.path.split(subdir)
+        if 'Series_' in foldername:
             # get the source image sequence attribute - SOPClassUID
             for file in sorted(files):
                 try:
@@ -99,32 +99,40 @@ if __name__ == '__main__':
                 list_all_ct_series.append(dict_series_folder)
                 break  # exit loop, we only need the first file
 
+    for subdir, dirs, files in os.walk(rootdir):
         k = 1
         if 'SeriesNo_' and 'Segmentations' in subdir:
             for file in sorted(files):  # sort files by date of creation
                 DcmFilePathName = os.path.join(subdir, file)
                 try:
                     dcm_file = os.path.normpath(DcmFilePathName)
-                    dataset = pydicom.read_file(dcm_file)
-                    dataset.PatientName = patient_name
-                    dataset.PatientID = patient_id
-                    dataset.PatientBirthDate = patient_dob
-                    dataset.InstitutionName = "None"
-                    dataset.InstitutionAddress = "None"
-                    dataset.SliceLocation = dataset.ImagePositionPatient[2]
-                    dataset.SOPInstanceUID = uid.generate_uid()
-                    dataset.InstanceNumber = k
-                    k += 1
-                    dataset.ImageType = "DERIVED\SECONDARY\AXIAL"
-                    dataset.SOPClassUID = "1.2.840.10008.5.1.4.1.1.66.4"
+                    dataset_segm = pydicom.read_file(dcm_file)
+                    dataset_segm.PatientName = patient_name
+                    dataset_segm.PatientID = patient_id
+                    dataset_segm.PatientBirthDate = patient_dob
+                    dataset_segm.InstitutionName = "None"
+                    dataset_segm.InstitutionAddress = "None"
+                    dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
+                    dataset_segm.SOPInstanceUID = uid.generate_uid()
+                    dataset_segm.InstanceNumber = k
+                    k += 1  # increase the instance number
+                    dataset_segm.ImageType = "DERIVED\SECONDARY\AXIAL"
+                    dataset_segm.SOPClassUID = "1.2.840.10008.5.1.4.1.1.66.4"
+
+                    dataset_segm_series_no = dataset_segm.SeriesNumber
+                    print('series number segmentation:', str(dataset_segm_series_no))
+                    df_ct_mapping = pd.DataFrame(list_all_ct_series)
+                    idx = df_ct_mapping.index[df_ct_mapping['SeriesNumber'] == dataset_segm_series_no]
+
+
                     # todo: assign correctly the series instance from plan series to tumour segm
                     # todo: find the source series instance uid based on the source series number
-                    dataset.ReferencedSOPClassUID = source_SOP_class_uid  # Uniquely identifies the referenced SOP Class
-                    dataset.ReferenceSOPInstanceUID = source_series_instance_uid  # Uniquely identifies the referenced SOP Instance
-                    dataset.DerivationDescription = source_series_number
-                    dataset.SegmentLabel = "Tumour"  # User-defined label identifying this segment.
+                    dataset_segm.ReferencedSOPClassUID = df_ct_mapping.loc[idx].SOPClassUID  # Uniquely identifies the referenced SOP Class
+                    dataset_segm.ReferenceSOPInstanceUID = source_series_instance_uid  # Uniquely identifies the referenced SOP Instance
+                    dataset_segm.DerivationDescription = source_series_number
+                    dataset_segm.SegmentLabel = "Tumour"  # User-defined label identifying this segment.
                     # get the series number
-                    dataset.save_as(dcm_file)
+                    dataset_segm.save_as(dcm_file)
 
                 except Exception as e:
                     pass
