@@ -75,35 +75,35 @@ if __name__ == '__main__':
     #             encode_xml(xmlfilename, patient_id, patient_name, patient_dob)
 
     #%% DICOM encoding
-    # todo: assign correctly the series instance from plan series to tumour segm
+
     # todo: assign correctly the series instance from validation series to ablation segm
+    list_all_ct_series = []
     for subdir, dirs, files in os.walk(rootdir):
         # study_0, study_1 case?
         if 'Series_' in subdir:
             # get the source image sequence attribute - SOPClassUID
             for file in sorted(files):
-
-                DcmFilePathName = os.path.join(subdir, file)
-                dcm_file_source = os.path.normpath(DcmFilePathName)
                 try:
+                    dcm_file = os.path.join(subdir, file)
                     dataset_source_ct = pydicom.read_file(dcm_file)
-                    source_series_instance_uid = dataset_source_ct.SeriesInstanceUID
-                    source_series_number = dataset_source_ct.SeriesNumber
-                    list_all_ct_series = []
-                    dict_series_folder = {"SeriesNumber":  source_series_number,
-                                          "SeriesInstanceNumber": source_series_instance_uid
-                                          }
-                    dict_series_folder.append(dict_series_folder)
-                    break  # exit loop, we only need the first file
                 except Exception:
                     # not dicom file so continue until you find one
                     continue
+                source_series_instance_uid = dataset_source_ct.SeriesInstanceUID
+                source_series_number = dataset_source_ct.SeriesNumber
+                source_SOP_class_uid = dataset_source_ct.SOPClassUID
+                dict_series_folder = {"SeriesNumber":  source_series_number,
+                                      "SeriesInstanceNumber": source_series_instance_uid,
+                                      "SOPClassUID": source_SOP_class_uid
+                                      }
+                list_all_ct_series.append(dict_series_folder)
+                break  # exit loop, we only need the first file
 
+        k = 1
         if 'SeriesNo_' and 'Segmentations' in subdir:
             for file in sorted(files):  # sort files by date of creation
                 DcmFilePathName = os.path.join(subdir, file)
                 try:
-                    k = 1
                     dcm_file = os.path.normpath(DcmFilePathName)
                     dataset = pydicom.read_file(dcm_file)
                     dataset.PatientName = patient_name
@@ -116,18 +116,20 @@ if __name__ == '__main__':
                     dataset.InstanceNumber = k
                     k += 1
                     dataset.ImageType = "DERIVED\SECONDARY\AXIAL"
-
-                    # find the source series instance uid based on the source series number
-
-                    dataset.SourceInstanceSequence = source_series_instance_uid
+                    dataset.SOPClassUID = "1.2.840.10008.5.1.4.1.1.66.4"
+                    # todo: assign correctly the series instance from plan series to tumour segm
+                    # todo: find the source series instance uid based on the source series number
+                    dataset.ReferencedSOPClassUID = source_SOP_class_uid  # Uniquely identifies the referenced SOP Class
+                    dataset.ReferenceSOPInstanceUID = source_series_instance_uid  # Uniquely identifies the referenced SOP Instance
                     dataset.DerivationDescription = source_series_number
-
+                    dataset.SegmentLabel = "Tumour"  # User-defined label identifying this segment.
                     # get the series number
                     dataset.save_as(dcm_file)
 
                 except Exception as e:
                     pass
                     print(repr(e))
+                    print('File where it breaks: ', DcmFilePathName)
 
 print("Patient Folder Segmentations Fixed:", patient_name)
 
