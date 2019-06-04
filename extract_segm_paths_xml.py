@@ -8,18 +8,24 @@ def create_tumour_ablation_mapping(path_xml_recordings):
     :param path_xml_recordings: filepath to where the XML recordings are (date_time)
     :return: dictionary list with tumor and its corresponding ablations per needle trajectory
     """
+
+    list_dict_paths_xml = []
+
     for subdir, dirs, files in os.walk(path_xml_recordings):
-        list_dict_paths_xml = []
+
         for file in sorted(files):
             xml_file = os.path.join(subdir, file)
-            if "AblationValidation_" or "Plan_" in file:
+            if file.startswith('AblationValidation_') or file.startswith('Plan_'):
                 try:
                     xmlobj = ut.parse(xml_file)
                 except Exception as e:
                     # the file is not an xml
                     continue
-
-                trajectories = xmlobj.Eagles.Trajectories
+                try:
+                    trajectories = xmlobj.Eagles.Trajectories
+                except Exception as e:
+                    print(repr(e))
+                    continue
                 for idx, tr in enumerate(trajectories):
                     single_tr = tr.Trajectory
                     for el in single_tr:
@@ -42,6 +48,6 @@ def create_tumour_ablation_mapping(path_xml_recordings):
                             }
                 list_dict_paths_xml.append(dict_series_path_xml)
 
-    df_paths_one_recordings_xml = pd.DataFrame(list_dict_paths_xml)
+        df_paths_one_recordings_xml = pd.DataFrame(list_dict_paths_xml)
 
-    return df_paths_one_recordings_xml
+        return df_paths_one_recordings_xml
