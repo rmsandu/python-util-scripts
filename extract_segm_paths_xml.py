@@ -22,18 +22,18 @@ def create_tumour_ablation_mapping(path_xml_recordings):
                         # ignore unique values,just loop until you find a not None value for both tumour and ablation at the same needle idx
                         try:
                             dict_series_path_xml = {
-                                "needle_idx": idx,
-                                "path_series_no_xml": el.Segmentation.Path.cdata,
-                                "series_uid_xml": el.Segmentation.SeriesUID.cdata,
-                                "segment_label": el.Segmentation["StructureType"]
+                                "NeedleIdx": idx,
+                                "PathSeries": el.Segmentation.Path.cdata,
+                                "SeriesUID_xml": el.Segmentation.SeriesUID.cdata,
+                                "SegmentLabel": el.Segmentation["StructureType"]
                             }
                         except Exception as e:
                             print(repr(e))
                             dict_series_path_xml = {
-                                "needle_idx": idx,
-                                "path_series_no_xml": None,
-                                "series_uid_xml": None,
-                                "segment_label": None
+                                "NeedleIdx": idx,
+                                "PathSeries": None,
+                                "SeriesUID_xml": None,
+                                "SegmentLabel": None
                             }
                 list_dict_paths_xml.append(dict_series_path_xml)
 
