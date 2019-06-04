@@ -13,9 +13,14 @@ def create_tumour_ablation_mapping(path_xml_recordings):
         for file in sorted(files):
             xml_file = os.path.join(subdir, file)
             if "AblationValidation_" or "Plan_" in file:
-                xmlobj = ut.parse(xml_file)
+                try:
+                    xmlobj = ut.parse(xml_file)
+                except Exception as e:
+                    # the file is not an xml
+                    continue
+
                 trajectories = xmlobj.Eagles.Trajectories
-                for idx, tr in trajectories:
+                for idx, tr in enumerate(trajectories):
                     single_tr = tr.Trajectory
                     for el in single_tr:
                         # match ablation and tumour segmentations based on the needle index
