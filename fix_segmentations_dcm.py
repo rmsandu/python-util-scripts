@@ -4,22 +4,62 @@ Created on Tue Feb 07 11:34:48 2019
 
 @author: Raluca Sandu
 """
-import re
+
 import os
+import sys
 import pydicom
 import pandas as pd
 from pydicom import uid
+from pydicom.sequence import Sequence
+from pydicom.dataset import Dataset
 import readInputKeyboard
 from anonym_xml_logs import encode_xml
 from extract_segm_paths_xml import create_tumour_ablation_mapping
 
-#%%
+
+def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
+                                       ReferencedSOPClassUID_src,
+                                       ReferencedSOPInstanceUID_src,
+                                       segment_label):
+    """
+    Add Reference to the tumour/ablation and source img in the DICOM segmentation metatags. 
+    :param dcm_segm: 
+    :param ReferencedSOPClassUID_segm: 
+    :param ReferencedSOPInstanceUID_segm: 
+    :param ReferencedSOPClassUID_src: 
+    :param ReferencedSOPInstanceUID_src: 
+    :return: 
+    """
+
+    if "Lession" or "Lesion" or "Tumor" in segment_label:
+        dataset_segm.SegmentLabel = "Tumor"
+    elif "Ablation" in dataset_segm_series_uid:
+        dataset_segm.SegmentLabel = "Ablation"
+
+    dataset_segm.SegmentationType = "BINARY"
+    dataset_segm.SegmentAlgorithmType = "SEMIAUTOMATIC"
+    dataset_segm.DerivationDescription = "Segmentation mask done with CAS-ONE IR segmentation algorithm"
+    dataset_segm.ImageType = "DERIVED\PRIMARY"
+    # dataset_segm.SOPClassUID = "1.2.840.10008.5.1.4.1.1.66.4"  # the sop class for segmentation
+
+    Segm_ds = Dataset()
+    Segm_ds.ReferencedSOPInstanceUID = ReferencedSOPInstanceUID_segm
+    Segm_ds.ReferencedSOPClassUID = dataset_segm.SOPClassUID
+
+    Source_ds = Dataset()
+    Source_ds.ReferencedSOPInstanceUID = ReferencedSOPInstanceUID_src
+    Source_ds.ReferencedSOPClassUID = ReferencedSOPClassUID_src
+
+    dataset_segm.ReferencedImageSequence = Sequence([Segm_ds])
+    dataset_segm.SourceImageSequence = Sequence([Source_ds])
+
+    return dcm_segm
+
+# %%
+
 
 if __name__ == '__main__':
-    # rootdir = os.path.normpath(readInputKeyboard.getNonEmptyString("Root Directory FilePath with Patient Folder"))
-    # patient_name = readInputKeyboard.getNonEmptyString("New Patient Name, eg MAV-STO-M06")
-    # patient_id = readInputKeyboard.getNonEmptyString("New Patient ID, eg. MAV-M06 ")
-    # patient_dob = readInputKeyboard.getNonEmptyString("Patient's BirthDate, format eg. 19540101 ")
+
     rootdir = r"C:\tmp_patients\Pat_M6"
     patient_name = "MAV-STO-M06"
     patient_id = "MAV-M06"
@@ -71,14 +111,15 @@ if __name__ == '__main__':
                 print('DF XML Paths not defined yet')
                 df_segmentations_paths_xml = create_tumour_ablation_mapping(path_recordings)
             else:
-                print('DF already exists')
+                pass  # DF already exists
 
             for file in sorted(files):
                 DcmFilePathName = os.path.join(subdir, file)
                 try:
                     dcm_file = os.path.normpath(DcmFilePathName)
                     dataset_segm = pydicom.read_file(dcm_file)
-                except Exception:
+                except Exception as e:
+                    print(repr(e))
                     continue  # not a DICOM file
                 # next lines will be executed only if the file is DICOM
                 dataset_segm.PatientName = patient_name
@@ -90,28 +131,40 @@ if __name__ == '__main__':
                 dataset_segm.SOPInstanceUID = uid.generate_uid()
                 dataset_segm.InstanceNumber = k
                 k += 1  # increase the instance number
-                dataset_segm.ImageType = "DERIVED\PRIMARY\AXIAL"
-                dataset_segm.SOPClassUID = "1.2.840.10008.5.1.4.1.1.66.4"  # the sop class for segmentation
 
                 dataset_segm_series_no = dataset_segm.SeriesNumber
                 dataset_segm_series_uid = dataset_segm.SeriesInstanceUID
-                print('series number segmentation:', str(dataset_segm_series_no))
+
                 df_ct_mapping = pd.DataFrame(list_all_ct_series)
                 idx_series_source = df_ct_mapping.index[df_ct_mapping['SeriesNumber'] == dataset_segm_series_no]
-                idx_series_xml = df_segmentations_paths_xml.index[
-                    df_segmentations_paths_xml["SeriesUID_xml"] == dataset_segm_series_uid]
 
-                dataset_segm.ReferencedSOPClassUID = df_ct_mapping.loc[idx_series_source].SOPClassUID.tolist()[0]
-                # Uniquely identifies the referenced SOP Instance of the source CT from which it was derived
-                dataset_segm.SourceImageSequence = \
-                    df_ct_mapping.loc[idx_series_source].SeriesInstanceNumberUID.tolist()[0]
+                idx_segm_xml = df_segmentations_paths_xml.index[
+                    df_segmentations_paths_xml["SeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
 
-                dataset_segm.ReferencedSOPInstanceUID = df_segmentations_paths_xml.loc[idx_series_xml].SeriesUID_xml.tolist()[0]
-                # User-defined label identifying this segment
+                # get the needle value at the index of the identified segmentation series_uid
+                needle_val = df_segmentations_paths_xml.NeedleIdx[idx_segm_xml]
+                # find all the needles df_indexes with the value identified previously
+                idx_needle_all = df_segmentations_paths_xml.index[
+                    df_segmentations_paths_xml["NeedleIdx"] == needle_val].tolist()
+                idx_referenced_segm = [el for el in idx_needle_all if el != idx_segm_xml]
 
-                dataset_segm.SegmentLabel = "Tumour"
-                dataset_segm.DerivationDescription = "Segmentation generated using CAS-ONE IR semi-automatic segmentation tool"
+                if len(idx_referenced_segm) > 1:
+                    print('The SeriesInstanceUID for the segmentations is not unique')
+                    sys.exit()
+
+                ReferencedSOPInstanceUID_src = df_ct_mapping.loc[idx_series_source].SeriesInstanceNumberUID.tolist()[0]
+                ReferencedSOPClassUID_src = df_ct_mapping.loc[idx_series_source].SOPClassUID.tolist()[0]
+                ReferencedSOPInstanceUID_segm = \
+                    df_segmentations_paths_xml.loc[idx_referenced_segm].SeriesUID_xml.tolist()[0]
+                segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
+                #
+                dataset_segm = add_general_reference_segmentation(dataset_segm, ReferencedSOPInstanceUID_segm,
+                                                   ReferencedSOPClassUID_src,
+                                                   ReferencedSOPInstanceUID_src,
+                                                   segment_label)
+
+                print(dataset_segm)
+
                 dataset_segm.save_as(dcm_file)
-
 
 print("Patient Folder Segmentations Fixed:", patient_name)
