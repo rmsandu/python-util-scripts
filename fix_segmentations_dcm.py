@@ -64,7 +64,14 @@ if __name__ == '__main__':
 
             path_segmentations, foldername = os.path.split(subdir)
             path_recordings, foldername = os.path.split(path_segmentations)
-            df_segmentations_paths_xml = create_tumour_ablation_mapping(path_recordings)
+
+            try:
+                df_segmentations_paths_xml
+            except NameError:
+                print('DF XML Paths not defined yet')
+                df_segmentations_paths_xml = create_tumour_ablation_mapping(path_recordings)
+            else:
+                print('DF already exists')
 
             for file in sorted(files):
                 DcmFilePathName = os.path.join(subdir, file)
@@ -94,17 +101,14 @@ if __name__ == '__main__':
                 idx_series_xml = df_segmentations_paths_xml.index[
                     df_segmentations_paths_xml["SeriesUID_xml"] == dataset_segm_series_uid]
 
-                # loop through the idx_series_xml until the value is not none for both tumour and ablation and
-                # and tumour and ablation the last
-
-                # Uniquely identifies the referenced SOP Class
-                # TODO: 1) add the source ct. 2) append) the tumour/ablation series_instance_uid
                 dataset_segm.ReferencedSOPClassUID = df_ct_mapping.loc[idx_series_source].SOPClassUID.tolist()[0]
-                # Uniquely identifies the referenced SOP Instance
-                dataset_segm.ReferencedSOPInstanceUID = \
+                # Uniquely identifies the referenced SOP Instance of the source CT from which it was derived
+                dataset_segm.SourceImageSequence = \
                     df_ct_mapping.loc[idx_series_source].SeriesInstanceNumberUID.tolist()[0]
 
+                dataset_segm.ReferencedSOPInstanceUID = df_segmentations_paths_xml.loc[idx_series_xml].SeriesUID_xml.tolist()[0]
                 # User-defined label identifying this segment
+
                 dataset_segm.SegmentLabel = "Tumour"
                 dataset_segm.DerivationDescription = "Segmentation generated using CAS-ONE IR semi-automatic segmentation tool"
                 dataset_segm.save_as(dcm_file)
