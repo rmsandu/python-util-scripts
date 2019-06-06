@@ -1,7 +1,12 @@
+# -*- coding: utf-8 -*-
+"""
+Created on June 06th 2019
+
+@author: Raluca Sandu
+"""
 import numpy as np
 import untangle as ut
 import xml.etree.ElementTree as ET
-
 
 
 def encode_xml(filename, patient_id, patient_name, patient_dob):
@@ -24,7 +29,7 @@ def encode_xml(filename, patient_id, patient_name, patient_dob):
         for pat in root.findall('PatientInfo'):
             pat.set('ID', patient_id)
             pat.set('Initial', patient_name)
-            pat.set('DOB', patient_dob + '-01-01')
+            pat.set('DOB', patient_dob[0:4] + '-01-01')
     except Exception as e:
         pass  # the xml elements not existent in this XML
     # Plan and Validation XML
