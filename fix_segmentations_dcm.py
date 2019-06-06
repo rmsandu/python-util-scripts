@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Feb 07 11:34:48 2019
+Created on June 06th 2019
 
 @author: Raluca Sandu
 """
@@ -12,7 +12,6 @@ import pandas as pd
 from pydicom import uid
 from pydicom.sequence import Sequence
 from pydicom.dataset import Dataset
-import readInputKeyboard
 from anonym_xml_logs import encode_xml
 from extract_segm_paths_xml import create_tumour_ablation_mapping
 
@@ -23,12 +22,12 @@ def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
                                        segment_label):
     """
     Add Reference to the tumour/ablation and source img in the DICOM segmentation metatags. 
-    :param dcm_segm: 
-    :param ReferencedSOPClassUID_segm: 
-    :param ReferencedSOPInstanceUID_segm: 
-    :param ReferencedSOPClassUID_src: 
-    :param ReferencedSOPInstanceUID_src: 
-    :return: 
+    :param dcm_segm: dcm file read with pydicom library
+    :param ReferencedSOPClassUID_segm:  SOPClassUID of the related segmentation file (tumour or ablation)
+    :param ReferencedSOPInstanceUID_segm: SeriesInstanceUID of the related segmentation file (tumour or ablation)
+    :param ReferencedSOPClassUID_src: SOPClassUID of the source/original image from which the segmentation was derived
+    :param ReferencedSOPInstanceUID_src: SeriesInstanceUID of the source image
+    :return: dicom single file/slice with new General Reference Sequence Tags
     """
 
     if "Lession" or "Lesion" or "Tumor" in segment_label:
@@ -40,7 +39,7 @@ def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
     dataset_segm.SegmentAlgorithmType = "SEMIAUTOMATIC"
     dataset_segm.DerivationDescription = "Segmentation mask done with CAS-ONE IR segmentation algorithm"
     dataset_segm.ImageType = "DERIVED\PRIMARY"
-    # dataset_segm.SOPClassUID = "1.2.840.10008.5.1.4.1.1.66.4"  # the sop class for segmentation
+    dataset_segm.SOPClassUID = "1.2.840.10008.5.1.4.1.1.66.4"  # the sop class for segmentation
 
     Segm_ds = Dataset()
     Segm_ds.ReferencedSOPInstanceUID = ReferencedSOPInstanceUID_segm
@@ -54,6 +53,7 @@ def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
     dataset_segm.SourceImageSequence = Sequence([Source_ds])
 
     return dcm_segm
+
 
 # %%
 
@@ -157,11 +157,11 @@ if __name__ == '__main__':
                 ReferencedSOPInstanceUID_segm = \
                     df_segmentations_paths_xml.loc[idx_referenced_segm].SeriesUID_xml.tolist()[0]
                 segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
-                #
+                # call function to add reference to the source and other segmentations
                 dataset_segm = add_general_reference_segmentation(dataset_segm, ReferencedSOPInstanceUID_segm,
-                                                   ReferencedSOPClassUID_src,
-                                                   ReferencedSOPInstanceUID_src,
-                                                   segment_label)
+                                                                  ReferencedSOPClassUID_src,
+                                                                  ReferencedSOPInstanceUID_src,
+                                                                  segment_label)
 
                 print(dataset_segm)
 
