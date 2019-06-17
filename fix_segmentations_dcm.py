@@ -12,7 +12,7 @@ import pandas as pd
 from pydicom import uid
 from pydicom.sequence import Sequence
 from pydicom.dataset import Dataset
-from anonym_xml_logs import encode_xml
+from anonymization_xml_logs import encode_xml
 from extract_segm_paths_xml import create_tumour_ablation_mapping
 
 
