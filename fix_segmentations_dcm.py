@@ -60,10 +60,11 @@ def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
 
 if __name__ == '__main__':
 
-    rootdir = r"C:\tmp_patients\Pat_M6"
-    patient_name = "MAV-STO-M06"
-    patient_id = "MAV-M06"
-    patient_dob = '19600101'
+    rootdir = r"C:\tmp_patients\Pat_M04_196311061029"
+    patient_name = "MAV-STO-M04"
+    patient_id = "M04"
+    patient_dob = '1963' \
+                  '0101'
     # %% XML encoding
     for subdir, dirs, files in os.walk(rootdir):
         for file in sorted(files):  # sort files by date of creation
@@ -90,12 +91,15 @@ if __name__ == '__main__':
                 source_series_instance_uid = dataset_source_ct.SeriesInstanceUID
                 source_series_number = dataset_source_ct.SeriesNumber
                 source_SOP_class_uid = dataset_source_ct.SOPClassUID
-                dict_series_folder = {"SeriesNumber": source_series_number,
-                                      "SeriesInstanceNumberUID": source_series_instance_uid,
-                                      "SOPClassUID": source_SOP_class_uid
-                                      }
-                list_all_ct_series.append(dict_series_folder)
-                break  # exit loop, we only need the first file
+                # if the ct series is not found in the dictionary, add it
+                result = next((item for item in list_all_ct_series if
+                               item["SeriesInstanceNumberUID"] == source_series_instance_uid), None)
+                if result is None:
+                    dict_series_folder = {"SeriesNumber": source_series_number,
+                                          "SeriesInstanceNumberUID": source_series_instance_uid,
+                                          "SOPClassUID": source_SOP_class_uid
+                                          }
+                    list_all_ct_series.append(dict_series_folder)
 
     for subdir, dirs, files in os.walk(rootdir):
         k = 1
@@ -106,6 +110,7 @@ if __name__ == '__main__':
             path_recordings, foldername = os.path.split(path_segmentations)
 
             try:
+                # check if the dataframe has been created already
                 df_segmentations_paths_xml
             except NameError:
                 print('DF XML Paths not defined yet')
@@ -163,7 +168,7 @@ if __name__ == '__main__':
                                                                   ReferencedSOPInstanceUID_src,
                                                                   segment_label)
 
-                print(dataset_segm)
+                # print(dataset_segm)
 
                 dataset_segm.save_as(dcm_file)
 
