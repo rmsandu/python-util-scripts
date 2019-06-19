@@ -1,16 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+Created  June 2019
+
+@author: Raluca Sandu
+"""
 import os
 import untangle as ut
-import pandas as pd
 
 
-
-
-def create_tumour_ablation_mapping(dir_xml_files, dict_segmentations_paths_xml):
+def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
     """
     Parses all the XML Files in a given directory and extracts the Source SeriesInstanceSeries on which the segmentation
     files were annotated and the SeriesInstanceUID of the segmentations
+    :param list_segmentations_paths_xml: list of dicts with SeriesInstanceUID, TimeStamp adn SourceUID of segmentation files
     :param dir_xml_files: filepath to where the XML recordings are (date_time)
-    :return: df_paths_one_recordings_xml: Pandas DF with segmentation Sorur
+    :return: list_segmentations_paths_xml: Pandas DF with segmentation Sorur
     """
 
     # list_dict_paths_xml = []
@@ -68,8 +72,12 @@ def create_tumour_ablation_mapping(dir_xml_files, dict_segmentations_paths_xml):
                     except NameError:
                         # do nothing, no dict_series_path_xml variable created
                         continue
-                    dict_segmentations_paths_xml.append(dict_series_path_xml)
+                    # if the ct series is not found in the dictionary, add it
+                    result = next((item for item in list_segmentations_paths_xml if
+                                   item["SeriesInstanceNumberUID"] == el.Segmentation.SeriesUID.cdata), None)
+                    if result is None:
+                        # only add unique segmentations paths, skip duplicates
+                        list_segmentations_paths_xml.append(dict_series_path_xml)
 
-        # df_paths_one_recordings_xml = pd.DataFrame(list_dict_paths_xml)
 
-        return dict_segmentations_paths_xml
+        return list_segmentations_paths_xml
