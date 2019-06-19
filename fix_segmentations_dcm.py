@@ -101,6 +101,14 @@ if __name__ == '__main__':
                                           }
                     list_all_ct_series.append(dict_series_folder)
 
+    df_ct_mapping = pd.DataFrame(list_all_ct_series)
+
+    print(df_ct_mapping)
+
+
+
+    dict_segmentations_paths_xml = []
+
     for subdir, dirs, files in os.walk(rootdir):
         k = 1
 
@@ -109,15 +117,13 @@ if __name__ == '__main__':
             path_segmentations, foldername = os.path.split(subdir)
             path_recordings, foldername = os.path.split(path_segmentations)
 
-            try:
-                # check if the dataframe has been created already
-                df_segmentations_paths_xml
-            except NameError:
-                print('DF XML Paths not defined yet')
-                df_segmentations_paths_xml = create_tumour_ablation_mapping(path_recordings)
-            else:
-                pass  # DF already exists
+            dict_segmentations_paths_xml = \
+                create_tumour_ablation_mapping(path_recordings, dict_segmentations_paths_xml)
 
+    df_segmentations_paths_xml = pd.DataFrame(dict_segmentations_paths_xml)
+
+    for subdir, dirs, files in os.walk(rootdir):
+        if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             for file in sorted(files):
                 DcmFilePathName = os.path.join(subdir, file)
                 try:
@@ -140,7 +146,57 @@ if __name__ == '__main__':
                 dataset_segm_series_no = dataset_segm.SeriesNumber
                 dataset_segm_series_uid = dataset_segm.SeriesInstanceUID
 
-                df_ct_mapping = pd.DataFrame(list_all_ct_series)
+
+                idx_series_source = df_ct_mapping.index[df_ct_mapping['SeriesNumber'] == dataset_segm_series_no]
+
+                idx_segm_xml = df_segmentations_paths_xml.index[
+                    df_segmentations_paths_xml["SeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
+
+                # get the needle value at the index of the identified segmentation series_uid
+                needle_val = df_segmentations_paths_xml.NeedleIdx[idx_segm_xml]
+                # find all the needles df_indexes with the value identified previously
+                idx_needle_all = df_segmentations_paths_xml.index[
+                    df_segmentations_paths_xml["NeedleIdx"] == needle_val].tolist()
+                idx_referenced_segm = [el for el in idx_needle_all if el != idx_segm_xml]
+
+                if len(idx_referenced_segm) > 1:
+                    print('The SeriesInstanceUID for the segmentations is not unique')
+                    sys.exit()
+
+                ReferencedSOPInstanceUID_src = df_ct_mapping.loc[idx_series_source].SeriesInstanceNumberUID.tolist()[0]
+                ReferencedSOPClassUID_src = df_ct_mapping.loc[idx_series_source].SOPClassUID.tolist()[0]
+                ReferencedSOPInstanceUID_segm = \
+                    df_segmentations_paths_xml.loc[idx_referenced_segm].SeriesUID_xml.tolist()[0]
+                segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
+                # call function to add reference to the source and other segmentations
+                dataset_segm = add_general_reference_segmentation(dataset_segm, ReferencedSOPInstanceUID_segm,
+                                                                  ReferencedSOPClassUID_src,
+                                                                  ReferencedSOPInstanceUID_src,
+                                                                  segment_label)
+
+                # print(dataset_segm)           for file in sorted(files):
+                DcmFilePathName = os.path.join(subdir, file)
+                try:
+                    dcm_file = os.path.normpath(DcmFilePathName)
+                    dataset_segm = pydicom.read_file(dcm_file)
+                except Exception as e:
+                    print(repr(e))
+                    continue  # not a DICOM file
+                # next lines will be executed only if the file is DICOM
+                dataset_segm.PatientName = patient_name
+                dataset_segm.PatientID = patient_id
+                dataset_segm.PatientBirthDate = patient_dob
+                dataset_segm.InstitutionName = "None"
+                dataset_segm.InstitutionAddress = "None"
+                dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
+                dataset_segm.SOPInstanceUID = uid.generate_uid()
+                dataset_segm.InstanceNumber = k
+                k += 1  # increase the instance number
+
+                dataset_segm_series_no = dataset_segm.SeriesNumber
+                dataset_segm_series_uid = dataset_segm.SeriesInstanceUID
+
+
                 idx_series_source = df_ct_mapping.index[df_ct_mapping['SeriesNumber'] == dataset_segm_series_no]
 
                 idx_segm_xml = df_segmentations_paths_xml.index[
@@ -171,5 +227,6 @@ if __name__ == '__main__':
                 # print(dataset_segm)
 
                 dataset_segm.save_as(dcm_file)
+
 
 print("Patient Folder Segmentations Fixed:", patient_name)

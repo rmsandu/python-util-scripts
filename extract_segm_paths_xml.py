@@ -3,15 +3,19 @@ import untangle as ut
 import pandas as pd
 
 
-def create_tumour_ablation_mapping(path_xml_recordings):
+
+
+def create_tumour_ablation_mapping(dir_xml_files, dict_segmentations_paths_xml):
     """
-    :param path_xml_recordings: filepath to where the XML recordings are (date_time)
-    :return: dictionary list with tumor and its corresponding ablations per needle trajectory
+    Parses all the XML Files in a given directory and extracts the Source SeriesInstanceSeries on which the segmentation
+    files were annotated and the SeriesInstanceUID of the segmentations
+    :param dir_xml_files: filepath to where the XML recordings are (date_time)
+    :return: df_paths_one_recordings_xml: Pandas DF with segmentation Sorur
     """
 
-    list_dict_paths_xml = []
+    # list_dict_paths_xml = []
 
-    for subdir, dirs, files in os.walk(path_xml_recordings):
+    for subdir, dirs, files in os.walk(dir_xml_files):
 
         for file in sorted(files):
             xml_file = os.path.join(subdir, file)
@@ -29,11 +33,22 @@ def create_tumour_ablation_mapping(path_xml_recordings):
                 for idx, tr in enumerate(trajectories):
                     single_tr = tr.Trajectory
                     for el in single_tr:
+                        # do the source series mapping based on the seriesID from the XML PatientData
                         # match ablation and tumour segmentations based on the needle index
-                        # ignore unique values,just loop until you find a not None value for both tumour and ablation at the same needle idx
+                        # ignore unique values, just loop until you find a not None value for both tumour and ablation at the same needle idx
+
+                        try:
+                            # check that both variables exist at the same time in the XML file
+                            el.Segmentation.Path.cdata
+                            xmlobj.Eagles.PatientData["seriesID"]
+                        except AttributeError:
+                            continue  # go back to the beginning of the loop
+
                         try:
                             dict_series_path_xml = {
+                                "Timestamp": xmlobj.Eagles["time"],
                                 "NeedleIdx": idx,
+                                "SourceSeriesID": xmlobj.Eagles.PatientData["seriesID"],
                                 "PathSeries": el.Segmentation.Path.cdata,
                                 "SeriesUID_xml": el.Segmentation.SeriesUID.cdata,
                                 "SegmentLabel": el.Segmentation["StructureType"]
@@ -41,13 +56,20 @@ def create_tumour_ablation_mapping(path_xml_recordings):
                         except Exception as e:
                             print(repr(e))
                             dict_series_path_xml = {
+                                "Timestamp": xmlobj.Eagles["time"],
                                 "NeedleIdx": idx,
+                                "SourceSeriesID": None,
                                 "PathSeries": None,
                                 "SeriesUID_xml": None,
                                 "SegmentLabel": None
                             }
-                list_dict_paths_xml.append(dict_series_path_xml)
+                    try:
+                        dict_series_path_xml
+                    except NameError:
+                        # do nothing, no dict_series_path_xml variable created
+                        continue
+                    dict_segmentations_paths_xml.append(dict_series_path_xml)
 
-        df_paths_one_recordings_xml = pd.DataFrame(list_dict_paths_xml)
+        # df_paths_one_recordings_xml = pd.DataFrame(list_dict_paths_xml)
 
-        return df_paths_one_recordings_xml
+        return dict_segmentations_paths_xml
