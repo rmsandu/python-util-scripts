@@ -54,7 +54,7 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                                 "NeedleIdx": idx,
                                 "SourceSeriesID": xmlobj.Eagles.PatientData["seriesID"],
                                 "PathSeries": el.Segmentation.Path.cdata,
-                                "SeriesUID_xml": el.Segmentation.SeriesUID.cdata,
+                                "SegmentationSeriesUID_xml": el.Segmentation.SeriesUID.cdata,
                                 "SegmentLabel": el.Segmentation["StructureType"]
                             }
                         except Exception as e:
@@ -64,7 +64,7 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                                 "NeedleIdx": idx,
                                 "SourceSeriesID": None,
                                 "PathSeries": None,
-                                "SeriesUID_xml": None,
+                                "SegmentationSeriesUID_xml": None,
                                 "SegmentLabel": None
                             }
                     try:
@@ -74,7 +74,7 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                         continue
                     # if the ct series is not found in the dictionary, add it
                     result = next((item for item in list_segmentations_paths_xml if
-                                   item["SeriesInstanceNumberUID"] == el.Segmentation.SeriesUID.cdata), None)
+                                   item["SegmentationSeriesUID_xml"] == el.Segmentation.SeriesUID.cdata), None)
                     if result is None:
                         # only add unique segmentations paths, skip duplicates
                         list_segmentations_paths_xml.append(dict_series_path_xml)
