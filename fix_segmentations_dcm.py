@@ -16,8 +16,8 @@ from anonymization_xml_logs import encode_xml
 from extract_segm_paths_xml import create_tumour_ablation_mapping
 
 
-def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
-                                       ReferencedSOPClassUID_src,
+def add_general_reference_segmentation(dcm_segm,
+                                       ReferencedSOPInstanceUID_segm,
                                        ReferencedSOPInstanceUID_src,
                                        segment_label):
     """
@@ -30,10 +30,13 @@ def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
     :return: dicom single file/slice with new General Reference Sequence Tags
     """
 
-    if "Lession" or "Lesion" or "Tumor" in segment_label:
+    if segment_label == "Lession":
         dataset_segm.SegmentLabel = "Tumor"
-    elif "Ablation" in dataset_segm_series_uid:
+    elif segment_label == "AblationZone":
         dataset_segm.SegmentLabel = "Ablation"
+
+    print(dataset_segm.SeriesInstanceUID)
+    print(dataset_segm.SegmentLabel)
 
     dataset_segm.SegmentationType = "BINARY"
     dataset_segm.SegmentAlgorithmType = "SEMIAUTOMATIC"
@@ -47,7 +50,6 @@ def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
 
     Source_ds = Dataset()
     Source_ds.ReferencedSOPInstanceUID = ReferencedSOPInstanceUID_src
-    Source_ds.ReferencedSOPClassUID = ReferencedSOPClassUID_src
 
     dataset_segm.ReferencedImageSequence = Sequence([Segm_ds])
     dataset_segm.SourceImageSequence = Sequence([Source_ds])
@@ -56,7 +58,6 @@ def add_general_reference_segmentation(dcm_segm, ReferencedSOPInstanceUID_segm,
 
 
 # %%
-
 
 if __name__ == '__main__':
 
@@ -102,26 +103,22 @@ if __name__ == '__main__':
                     list_all_ct_series.append(dict_series_folder)
 
     df_ct_mapping = pd.DataFrame(list_all_ct_series)
-
-    print(df_ct_mapping)
-
-
-
-    dict_segmentations_paths_xml = []
-
+    # %% Create DF of CT Images and Segmentations SeriesInstanceUIDs based on the XML recordings
+    list_segmentations_paths_xml = []
     for subdir, dirs, files in os.walk(rootdir):
         k = 1
-
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
-
             path_segmentations, foldername = os.path.split(subdir)
             path_recordings, foldername = os.path.split(path_segmentations)
 
             dict_segmentations_paths_xml = \
-                create_tumour_ablation_mapping(path_recordings, dict_segmentations_paths_xml)
+                create_tumour_ablation_mapping(path_recordings, list_segmentations_paths_xml)
 
-    df_segmentations_paths_xml = pd.DataFrame(dict_segmentations_paths_xml)
+    df_segmentations_paths_xml = pd.DataFrame(list_segmentations_paths_xml)
+    df_segmentations_paths_xml["TimeStartSegmentation"] = df_segmentations_paths_xml["Timestamp"].map(
+        lambda x: x.split()[0])
 
+    # %% Edit each DICOM Segmentation File Individually by adding reference Source CT and the related segmentation
     for subdir, dirs, files in os.walk(rootdir):
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             for file in sorted(files):
@@ -146,87 +143,38 @@ if __name__ == '__main__':
                 dataset_segm_series_no = dataset_segm.SeriesNumber
                 dataset_segm_series_uid = dataset_segm.SeriesInstanceUID
 
-
                 idx_series_source = df_ct_mapping.index[df_ct_mapping['SeriesNumber'] == dataset_segm_series_no]
 
                 idx_segm_xml = df_segmentations_paths_xml.index[
-                    df_segmentations_paths_xml["SeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
+                    df_segmentations_paths_xml["SegmentationSeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
 
-                # get the needle value at the index of the identified segmentation series_uid
-                needle_val = df_segmentations_paths_xml.NeedleIdx[idx_segm_xml]
-                # find all the needles df_indexes with the value identified previously
-                idx_needle_all = df_segmentations_paths_xml.index[
-                    df_segmentations_paths_xml["NeedleIdx"] == needle_val].tolist()
-                idx_referenced_segm = [el for el in idx_needle_all if el != idx_segm_xml]
+                # get the timestamp value at the index of the identified segmentation series_uid both the Plan.xml (
+                # tumour path) and Ablation_Validation.xml (ablation) have the same starting time in the XML
+                # find the other segmentation with the matching start time != from the seriesinstanceuid read atm
+                time_intervention = df_segmentations_paths_xml.TimeStartSegmentation[idx_segm_xml]
+                idx_segmentations_time = df_segmentations_paths_xml.index[
+                    df_segmentations_paths_xml["TimeStartSegmentation"] == time_intervention].tolist()
+
+                idx_referenced_segm = [el for el in idx_segmentations_time if el != idx_segm_xml]
 
                 if len(idx_referenced_segm) > 1:
                     print('The SeriesInstanceUID for the segmentations is not unique')
                     sys.exit()
 
-                ReferencedSOPInstanceUID_src = df_ct_mapping.loc[idx_series_source].SeriesInstanceNumberUID.tolist()[0]
-                ReferencedSOPClassUID_src = df_ct_mapping.loc[idx_series_source].SOPClassUID.tolist()[0]
+                ReferencedSOPInstanceUID_src = \
+                    df_segmentations_paths_xml.loc[idx_segm_xml].SourceSeriesID
                 ReferencedSOPInstanceUID_segm = \
-                    df_segmentations_paths_xml.loc[idx_referenced_segm].SeriesUID_xml.tolist()[0]
+                    df_segmentations_paths_xml.loc[idx_referenced_segm[0]].SegmentationSeriesUID_xml
                 segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
+
                 # call function to add reference to the source and other segmentations
-                dataset_segm = add_general_reference_segmentation(dataset_segm, ReferencedSOPInstanceUID_segm,
-                                                                  ReferencedSOPClassUID_src,
-                                                                  ReferencedSOPInstanceUID_src,
-                                                                  segment_label)
-
-                # print(dataset_segm)           for file in sorted(files):
-                DcmFilePathName = os.path.join(subdir, file)
-                try:
-                    dcm_file = os.path.normpath(DcmFilePathName)
-                    dataset_segm = pydicom.read_file(dcm_file)
-                except Exception as e:
-                    print(repr(e))
-                    continue  # not a DICOM file
-                # next lines will be executed only if the file is DICOM
-                dataset_segm.PatientName = patient_name
-                dataset_segm.PatientID = patient_id
-                dataset_segm.PatientBirthDate = patient_dob
-                dataset_segm.InstitutionName = "None"
-                dataset_segm.InstitutionAddress = "None"
-                dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
-                dataset_segm.SOPInstanceUID = uid.generate_uid()
-                dataset_segm.InstanceNumber = k
-                k += 1  # increase the instance number
-
-                dataset_segm_series_no = dataset_segm.SeriesNumber
-                dataset_segm_series_uid = dataset_segm.SeriesInstanceUID
-
-
-                idx_series_source = df_ct_mapping.index[df_ct_mapping['SeriesNumber'] == dataset_segm_series_no]
-
-                idx_segm_xml = df_segmentations_paths_xml.index[
-                    df_segmentations_paths_xml["SeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
-
-                # get the needle value at the index of the identified segmentation series_uid
-                needle_val = df_segmentations_paths_xml.NeedleIdx[idx_segm_xml]
-                # find all the needles df_indexes with the value identified previously
-                idx_needle_all = df_segmentations_paths_xml.index[
-                    df_segmentations_paths_xml["NeedleIdx"] == needle_val].tolist()
-                idx_referenced_segm = [el for el in idx_needle_all if el != idx_segm_xml]
-
-                if len(idx_referenced_segm) > 1:
-                    print('The SeriesInstanceUID for the segmentations is not unique')
-                    sys.exit()
-
-                ReferencedSOPInstanceUID_src = df_ct_mapping.loc[idx_series_source].SeriesInstanceNumberUID.tolist()[0]
-                ReferencedSOPClassUID_src = df_ct_mapping.loc[idx_series_source].SOPClassUID.tolist()[0]
-                ReferencedSOPInstanceUID_segm = \
-                    df_segmentations_paths_xml.loc[idx_referenced_segm].SeriesUID_xml.tolist()[0]
-                segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
-                # call function to add reference to the source and other segmentations
-                dataset_segm = add_general_reference_segmentation(dataset_segm, ReferencedSOPInstanceUID_segm,
-                                                                  ReferencedSOPClassUID_src,
+                dataset_segm = add_general_reference_segmentation(dataset_segm,
+                                                                  ReferencedSOPInstanceUID_segm,
                                                                   ReferencedSOPInstanceUID_src,
                                                                   segment_label)
 
                 # print(dataset_segm)
 
                 dataset_segm.save_as(dcm_file)
-
 
 print("Patient Folder Segmentations Fixed:", patient_name)
