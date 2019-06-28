@@ -49,6 +49,12 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                             continue  # go back to the beginning of the loop
 
                         try:
+                            segmentation_series_uid = el.Segmentation.SeriesUID.cdata
+                        except Exception:
+                            # probably this variable does not exist
+                            continue
+
+                        try:
                             dict_series_path_xml = {
                                 "Timestamp": xmlobj.Eagles["time"],
                                 "NeedleIdx": idx,

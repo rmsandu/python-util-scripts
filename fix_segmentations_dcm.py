@@ -35,14 +35,10 @@ def add_general_reference_segmentation(dcm_segm,
     elif segment_label == "AblationZone":
         dataset_segm.SegmentLabel = "Ablation"
 
-    print(dataset_segm.SeriesInstanceUID)
-    print(dataset_segm.SegmentLabel)
-
     dataset_segm.SegmentationType = "BINARY"
     dataset_segm.SegmentAlgorithmType = "SEMIAUTOMATIC"
-    dataset_segm.DerivationDescription = "Segmentation mask done with CAS-ONE IR segmentation algorithm"
+    dataset_segm.DerivationDescription = "CasOneIR"
     dataset_segm.ImageType = "DERIVED\PRIMARY"
-    dataset_segm.SOPClassUID = "1.2.840.10008.5.1.4.1.1.66.4"  # the sop class for segmentation
 
     Segm_ds = Dataset()
     Segm_ds.ReferencedSOPInstanceUID = ReferencedSOPInstanceUID_segm
@@ -61,10 +57,10 @@ def add_general_reference_segmentation(dcm_segm,
 
 if __name__ == '__main__':
 
-    rootdir = r"C:\tmp_patients\Pat_M04_196311061029"
-    patient_name = "MAV-STO-M04"
-    patient_id = "M04"
-    patient_dob = '1963' \
+    rootdir = r"C:\tmp_patients\Pat_M6"
+    patient_name = "MAV-STO-M06"
+    patient_id = "M06"
+    patient_dob = '1960' \
                   '0101'
     # %% XML encoding
     for subdir, dirs, files in os.walk(rootdir):
@@ -106,7 +102,6 @@ if __name__ == '__main__':
     # %% Create DF of CT Images and Segmentations SeriesInstanceUIDs based on the XML recordings
     list_segmentations_paths_xml = []
     for subdir, dirs, files in os.walk(rootdir):
-        k = 1
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             path_segmentations, foldername = os.path.split(subdir)
             path_recordings, foldername = os.path.split(path_segmentations)
@@ -120,6 +115,7 @@ if __name__ == '__main__':
 
     # %% Edit each DICOM Segmentation File Individually by adding reference Source CT and the related segmentation
     for subdir, dirs, files in os.walk(rootdir):
+        k = 1
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             for file in sorted(files):
                 DcmFilePathName = os.path.join(subdir, file)
@@ -135,7 +131,7 @@ if __name__ == '__main__':
                 dataset_segm.PatientBirthDate = patient_dob
                 dataset_segm.InstitutionName = "None"
                 dataset_segm.InstitutionAddress = "None"
-                dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
+                # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
                 dataset_segm.SOPInstanceUID = uid.generate_uid()
                 dataset_segm.InstanceNumber = k
                 k += 1  # increase the instance number
@@ -145,8 +141,12 @@ if __name__ == '__main__':
 
                 idx_series_source = df_ct_mapping.index[df_ct_mapping['SeriesNumber'] == dataset_segm_series_no]
 
-                idx_segm_xml = df_segmentations_paths_xml.index[
-                    df_segmentations_paths_xml["SegmentationSeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
+                try:
+
+                    idx_segm_xml = df_segmentations_paths_xml.index[
+                        df_segmentations_paths_xml["SegmentationSeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
+                except Exception as e:
+                    print(repr(e))
 
                 # get the timestamp value at the index of the identified segmentation series_uid both the Plan.xml (
                 # tumour path) and Ablation_Validation.xml (ablation) have the same starting time in the XML
@@ -167,13 +167,13 @@ if __name__ == '__main__':
                     df_segmentations_paths_xml.loc[idx_referenced_segm[0]].SegmentationSeriesUID_xml
                 segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
 
-                # call function to add reference to the source and other segmentations
+                ## call function to add reference to the source and other segmentations
                 dataset_segm = add_general_reference_segmentation(dataset_segm,
                                                                   ReferencedSOPInstanceUID_segm,
                                                                   ReferencedSOPInstanceUID_src,
                                                                   segment_label)
 
-                # print(dataset_segm)
+                print(dataset_segm)
 
                 dataset_segm.save_as(dcm_file)
 

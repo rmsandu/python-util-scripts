@@ -13,10 +13,10 @@ from anonymization_xml_logs import encode_xml
 
 if __name__ == '__main__':
 
-    rootdir = r""
-    patient_name = "MAV-STO-M07"
-    patient_id = "MAV-M07"
-    patient_dob = '19490101'
+    rootdir = r"C:\tmp_patients\Pat_M02_195004050117\Study_840\Series_12"
+    patient_name = "MAV-STO-M02"
+    patient_id = "M02"
+    patient_dob = '19500101'
     #%% XML encoding
     for subdir, dirs, files in os.walk(rootdir):
 
@@ -37,7 +37,7 @@ if __name__ == '__main__':
                 dataset = pydicom.read_file(dcm_file)
                 dataset.PatientName = patient_name
                 dataset.PatientID = patient_id
-                dataset.PatientBirthDate = patient_dob
+                # dataset.PatientBirthDate = patient_dob
                 dataset.InstitutionName = "None"
                 dataset.InstitutionAddress = "None"
                 dataset.save_as(dcm_file)
