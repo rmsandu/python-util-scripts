@@ -39,51 +39,59 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                     for el in single_tr:
                         # do the source series mapping based on the seriesID from the XML PatientData
                         # match ablation and tumour segmentations based on the needle index
-                        # ignore unique values, just loop until you find a not None value for both tumour and ablation at the same needle idx
-
+                        # ignore unique values
+                        # just loop until you find a not None value for both tumour and ablation at the same needle idx
                         try:
-                            # check that both variables exist at the same time in the XML file
-                            el.Segmentation.Path.cdata
-                            xmlobj.Eagles.PatientData["seriesID"]
+                            segmentation = el.Segmentation
+                            # todo: sphere case, what happens when no segmentation path available
                         except AttributeError:
+                            # no segmentation found in this trajectory
                             continue  # go back to the beginning of the loop
-
                         try:
                             segmentation_series_uid = el.Segmentation.SeriesUID.cdata
-                        except Exception:
-                            # probably this variable does not exist
-                            continue
+                        except AttributeError:
+                            print("No segmentation series uid for this segmentation")
+                            segmentation_series_uid = None
+                        try:
+                            segmentation_path_series = el.Segmentation.Path.cdata
+                        except AttributeError:
+                            print('no segmentation path available')
+                            segmentation_path_series = None
+                        try:
+                            type_of_segmentation = el.Segmentation["TypeOfSegmentation"]
+                        except AttributeError:
+                            type_of_segmentation = None
 
                         try:
-                            dict_series_path_xml = {
-                                "Timestamp": xmlobj.Eagles["time"],
-                                "NeedleIdx": idx,
-                                "SourceSeriesID": xmlobj.Eagles.PatientData["seriesID"],
-                                "PathSeries": el.Segmentation.Path.cdata,
-                                "SegmentationSeriesUID_xml": el.Segmentation.SeriesUID.cdata,
-                                "SegmentLabel": el.Segmentation["StructureType"]
-                            }
-                        except Exception as e:
-                            print(repr(e))
-                            dict_series_path_xml = {
-                                "Timestamp": xmlobj.Eagles["time"],
-                                "NeedleIdx": idx,
-                                "SourceSeriesID": None,
-                                "PathSeries": None,
-                                "SegmentationSeriesUID_xml": None,
-                                "SegmentLabel": None
-                            }
-                    try:
-                        dict_series_path_xml
-                    except NameError:
-                        # do nothing, no dict_series_path_xml variable created
-                        continue
-                    # if the ct series is not found in the dictionary, add it
-                    result = next((item for item in list_segmentations_paths_xml if
-                                   item["SegmentationSeriesUID_xml"] == el.Segmentation.SeriesUID.cdata), None)
-                    if result is None:
-                        # only add unique segmentations paths, skip duplicates
-                        list_segmentations_paths_xml.append(dict_series_path_xml)
+                            sphere_radius = el.Segmentation["SphereRadius"]
+                        except AttributeError:
+                            sphere_radius = None
 
+                        dict_series_path_xml = {
+                            "Timestamp": xmlobj.Eagles["time"],
+                            "NeedleIdx": idx,
+                            "SourceSeriesID": xmlobj.Eagles.PatientData["seriesID"],
+                            "PathSeries": segmentation_path_series,
+                            "SegmentationSeriesUID_xml": segmentation_series_uid,
+                            "SegmentLabel": el.Segmentation["StructureType"],
+                            "TypeOfSegmentation": type_of_segmentation,
+                            "SphereRadius": sphere_radius
+                        }
+
+                        if segmentation_series_uid and sphere_radius is not None:
+                            try:
+                                # if the ct series is not found in the dictionary, add it
+                                series_uid_found = next((item for item in list_segmentations_paths_xml if
+                                                         item["SegmentationSeriesUID_xml"] == segmentation_series_uid),
+                                                        None)
+                                sphere_radius = next(
+                                    (item for item in list_segmentations_paths_xml if item["SphereRadius"] == sphere_radius),
+                                    None)
+                            except AttributeError:
+                                print('WTF')
+                                # print(list_segmentations_paths_xml)
+                            if series_uid_found is not None or sphere_radius is not None:
+                                # only add unique segmentations paths, skip duplicates
+                                list_segmentations_paths_xml.append(dict_series_path_xml)
 
         return list_segmentations_paths_xml

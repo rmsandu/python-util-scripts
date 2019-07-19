@@ -52,16 +52,15 @@ def add_general_reference_segmentation(dcm_segm,
     dataset_segm.SourceImageSequence = Sequence([Source_ds])
 
     return dcm_segm
-
-
 # %%
+
 
 if __name__ == '__main__':
 
-    rootdir = r"C:\tmp_patients\Pat_MAV_BE_B01_"
-    patient_name = "MAV-BER-B01"
-    patient_id = "B01"
-    patient_dob = '1942' \
+    rootdir = r"C:\tmp_patients\Pat_MAV_BE_B04"
+    patient_name = "MAV-BER-B04"
+    patient_id = "B04"
+    patient_dob = '1946' \
                   '0101'
     # %% XML encoding
     for subdir, dirs, files in os.walk(rootdir):
@@ -144,57 +143,56 @@ if __name__ == '__main__':
                 dataset_segm_series_no = dataset_segm.SeriesNumber
                 dataset_segm_series_uid = dataset_segm.SeriesInstanceUID
 
+                # try:
+                idx_segm_xml = df_segmentations_paths_xml.index[
+                    df_segmentations_paths_xml["SegmentationSeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
 
+                # get the timestamp value at the index of the identified segmentation series_uid both the Plan.xml (
+                # tumour path) and Ablation_Validation.xml (ablation) have the same starting time in the XML
+                # find the other segmentation with the matching start time != from the seriesinstanceuid read atm
+                time_intervention = df_segmentations_paths_xml.TimeStartSegmentation[idx_segm_xml]
+                idx_segmentations_time = df_segmentations_paths_xml.index[
+                    df_segmentations_paths_xml["TimeStartSegmentation"] == time_intervention].tolist()
 
-                try:
-                    idx_segm_xml = df_segmentations_paths_xml.index[
-                        df_segmentations_paths_xml["SegmentationSeriesUID_xml"] == dataset_segm_series_uid].tolist()[0]
+                idx_referenced_segm = [el for el in idx_segmentations_time if el != idx_segm_xml]
 
-                    # get the timestamp value at the index of the identified segmentation series_uid both the Plan.xml (
-                    # tumour path) and Ablation_Validation.xml (ablation) have the same starting time in the XML
-                    # find the other segmentation with the matching start time != from the seriesinstanceuid read atm
-                    time_intervention = df_segmentations_paths_xml.TimeStartSegmentation[idx_segm_xml]
-                    idx_segmentations_time = df_segmentations_paths_xml.index[
-                        df_segmentations_paths_xml["TimeStartSegmentation"] == time_intervention].tolist()
+                if len(idx_referenced_segm) > 1:
+                    print('The SeriesInstanceUID for the segmentations is not unique at the following address: ',
+                          DcmFilePathName)
+                    sys.exit()
 
-                    idx_referenced_segm = [el for el in idx_segmentations_time if el != idx_segm_xml]
+                ReferencedSOPInstanceUID_src = \
+                    df_segmentations_paths_xml.loc[idx_segm_xml].SourceSeriesID
 
-                    if len(idx_referenced_segm) > 1:
-                        print('The SeriesInstanceUID for the segmentations is not unique at the following address: ',
-                              DcmFilePathName)
-                        sys.exit()
+                # get the SeriesInstanceUID of the source CT from the XML files.
+                # 1) look for it in DF of the source CTs
+                # 2) get the corresponding StudyInstanceUID
+                idx_series_source_study_instance_uid = df_ct_mapping.index[
+                    df_ct_mapping['SeriesInstanceNumberUID'] == ReferencedSOPInstanceUID_src].tolist()
 
-                    ReferencedSOPInstanceUID_src = \
-                        df_segmentations_paths_xml.loc[idx_segm_xml].SourceSeriesID
+                if len(idx_series_source_study_instance_uid) > 1:
+                    print('The StudyInstanceUID for the segmentations is not unique at the following address: ',
+                          DcmFilePathName)
+                    sys.exit()
 
-                    # get the SeriesInstanceUID of the source CT from the XML files.
-                    # 1) look for it in DF of the source CTs
-                    # 2) get the corresponding StudyInstanceUID
-                    idx_series_source_study_instance_uid = df_ct_mapping.index[
-                        df_ct_mapping['SeriesInstanceNumberUID'] == ReferencedSOPInstanceUID_src].tolist()
+                StudyInstanceUID_src = df_ct_mapping.loc[idx_series_source_study_instance_uid[0]].StudyInstanceUID
 
-                    if len(idx_series_source_study_instance_uid) > 1:
-                        print('The StudyInstanceUID for the segmentations is not unique at the following address: ',
-                              DcmFilePathName)
-                        sys.exit()
+                ReferencedSOPInstanceUID_segm = \
+                    df_segmentations_paths_xml.loc[idx_referenced_segm[0]].SegmentationSeriesUID_xml
 
-                    StudyInstanceUID_src = df_ct_mapping.loc[idx_series_source_study_instance_uid[0]].StudyInstanceUID
-                    print(StudyInstanceUID_src)
-
-                    ReferencedSOPInstanceUID_segm = \
-                        df_segmentations_paths_xml.loc[idx_referenced_segm[0]].SegmentationSeriesUID_xml
-
-                    segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
+                segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
 
                     # call function to add reference to the source and other segmentations
-                    dataset_segm = add_general_reference_segmentation(dataset_segm,
-                                                                      ReferencedSOPInstanceUID_segm,
-                                                                      ReferencedSOPInstanceUID_src,
-                                                                      StudyInstanceUID_src,
-                                                                      segment_label)
-                except Exception as e:
-                    print(repr(e) + "\n No Segmentation Found at this address: ", DcmFilePathName)
+                    #todo: add the sphere to dicom what...? if there is no segmentation...
+                    #todo: first have to create the sphere segmentations
+                    # dataset_segm = add_general_reference_segmentation(dataset_segm,
+                    #                                                    ReferencedSOPInstanceUID_segm,
+                    #                                                    ReferencedSOPInstanceUID_src,
+                    #                                                    StudyInstanceUID_src,
+                    #                                                    segment_label)
+                # except Exception as e:
+                #     print(repr(e) + "\n No Segmentation Found at this address: ", DcmFilePathName)
 
-                dataset_segm.save_as(dcm_file) # save to disk
+                dataset_segm.save_as(dcm_file)  # save to disk
 
 print("Patient Folder Segmentations Fixed:", patient_name)
