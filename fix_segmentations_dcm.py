@@ -17,7 +17,7 @@ from extract_segm_paths_xml import create_tumour_ablation_mapping
 
 
 def add_general_reference_segmentation(dcm_segm,
-                                       ReferencedSOPInstanceUID_segm,
+                                       ReferencedSeriesInstanceUID_segm,
                                        ReferencedSOPInstanceUID_src,
                                        StudyInstanceUID_src,
                                        segment_label,
@@ -43,7 +43,7 @@ def add_general_reference_segmentation(dcm_segm,
     dataset_segm.ImageType = "DERIVED\PRIMARY"
 
     Segm_ds = Dataset()
-    Segm_ds.ReferencedSOPInstanceUID = ReferencedSOPInstanceUID_segm
+    Segm_ds.ReferencedSOPInstanceUID = ReferencedSeriesInstanceUID_segm
     Segm_ds.ReferencedSOPClassUID = dataset_segm.SOPClassUID
 
     Source_ds = Dataset()
@@ -53,6 +53,8 @@ def add_general_reference_segmentation(dcm_segm,
     dataset_segm.SourceImageSequence = Sequence([Source_ds])
 
     return dcm_segm
+
+
 # %%
 
 
@@ -63,7 +65,34 @@ if __name__ == '__main__':
     patient_id = "B04"
     patient_dob = '1946' \
                   '0101'
-    # %% XML encoding
+
+    # %% Change the Metatags of the Segmentations
+    for subdir, dirs, files in os.walk(rootdir):
+        if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
+            k = 1
+            SeriesInstanceUID_segmentation = uid.generate_uid()  # generate a new series instance uid for each folder
+            for file in sorted(files):
+                DcmFilePathName = os.path.join(subdir, file)
+                try:
+                    dcm_file = os.path.normpath(DcmFilePathName)
+                    dataset_segm = pydicom.read_file(dcm_file)
+                except Exception as e:
+                    print(repr(e))
+                    continue  # not a DICOM file
+                # next lines will be executed only if the file is DICOM
+                dataset_segm.PatientName = patient_name
+                dataset_segm.PatientID = patient_id
+                dataset_segm.PatientBirthDate = patient_dob
+                dataset_segm.InstitutionName = "None"
+                dataset_segm.InstitutionAddress = "None"
+                # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
+                dataset_segm.SOPInstanceUID = uid.generate_uid()
+                dataset_segm.SeriesInstanceUID = SeriesInstanceUID_segmentation
+                dataset_segm.InstanceNumber = k
+                k += 1  # increase the instance number
+                dataset_segm.save_as(dcm_file)  # save to disk
+
+    # %% XML encoding and re-writing of the SeriesInstanceUID of the segmentations
     for subdir, dirs, files in os.walk(rootdir):
         for file in sorted(files):  # sort files by date of creation
             fileName, fileExtension = os.path.splitext(file)
@@ -108,15 +137,13 @@ if __name__ == '__main__':
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             path_segmentations, foldername = os.path.split(subdir)
             path_recordings, foldername = os.path.split(path_segmentations)
-
             dict_segmentations_paths_xml = \
                 create_tumour_ablation_mapping(path_recordings, list_segmentations_paths_xml)
     df_segmentations_paths_xml = pd.DataFrame(list_segmentations_paths_xml)
 
-    # check if the dataframe is empty, then exit the program.
+    # check if the dataframe is empty, exit the script if true
     if df_segmentations_paths_xml.empty:
         sys.exit("No Segmentations Paths found in the XML Cas-Recordings")
-
     try:
         df_segmentations_paths_xml["TimeStartSegmentation"] = df_segmentations_paths_xml["Timestamp"].map(
             lambda x: x.split()[0])
@@ -127,6 +154,7 @@ if __name__ == '__main__':
     for subdir, dirs, files in os.walk(rootdir):
         k = 1
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
+            SeriesInstanceUID_segmentation = uid.generate_uid()  # generate a new series instance uid for each folder
             for file in sorted(files):
                 DcmFilePathName = os.path.join(subdir, file)
                 try:
@@ -135,25 +163,12 @@ if __name__ == '__main__':
                 except Exception as e:
                     print(repr(e))
                     continue  # not a DICOM file
-                # next lines will be executed only if the file is DICOM
-                dataset_segm.PatientName = patient_name
-                dataset_segm.PatientID = patient_id
-                dataset_segm.PatientBirthDate = patient_dob
-                dataset_segm.InstitutionName = "None"
-                dataset_segm.InstitutionAddress = "None"
-                # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
-                dataset_segm.SOPInstanceUID = uid.generate_uid()
-                dataset_segm.InstanceNumber = k
-                k += 1  # increase the instance number
 
                 dataset_segm_series_no = dataset_segm.SeriesNumber
                 dataset_segm_series_uid = dataset_segm.SeriesInstanceUID
                 path_segmentations_idx = subdir.find("Segmentations")
-                path_segmentations_folder = subdir[path_segmentations_idx-1:]
+                path_segmentations_folder = subdir[path_segmentations_idx - 1:]
 
-                # try:
-                # todo: look for the absolute path instead of the seriesuid
-                # todo: correct the seriesinstanceuid
                 try:
                     idx_segm_xml = df_segmentations_paths_xml.index[
                         df_segmentations_paths_xml["PathSeries"] == path_segmentations_folder].tolist()[0]
@@ -164,7 +179,6 @@ if __name__ == '__main__':
                 # tumour path) and Ablation_Validation.xml (ablation) have the same starting time in the XML
                 # find the other segmentation with the matching start time != from the seriesinstanceuid read atm
                 needle_idx = df_segmentations_paths_xml.NeedleIdx[idx_segm_xml]
-
                 ReferencedSOPInstanceUID_src = \
                     df_segmentations_paths_xml.loc[idx_segm_xml].SourceSeriesID
 
@@ -191,20 +205,25 @@ if __name__ == '__main__':
                           DcmFilePathName)
                     sys.exit()
 
-                ReferencedSOPInstanceUID_segm = \
-                    df_segmentations_paths_xml.loc[idx_referenced_segm[0]].SegmentationSeriesUID_xml
+                #%% get the path series instead of the segmentationseriesuid_xml
+                #  read the SeriesInstanceUID from the DICOM file (take the path)
+                ReferencedSOPInstanceUID_path = \
+                    df_segmentations_paths_xml.loc[idx_referenced_segm[0]].PathSeries
+
+                referenced_dcm_file = subdir[0:len(subdir) - len(path_segmentations_folder)] +
+                                                   ReferencedSOPInstanceUID_path
+
+                ReferencedSOPInstanceUID_ds = pydicom.read_file(referenced_dcm_file)
+                ReferencedSeriesInstanceUID_segm = ReferencedSOPInstanceUID_ds.SeriesInstanceUID
 
                 segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
 
                 # call function to change the segmentation uid
                 dataset_segm = add_general_reference_segmentation(dataset_segm,
-                                                                  ReferencedSOPInstanceUID_segm,
+                                                                  ReferencedSeriesInstanceUID_segm,
                                                                   ReferencedSOPInstanceUID_src,
                                                                   StudyInstanceUID_src,
                                                                   segment_label)
-                # except Exception as e:
-                #     print(repr(e) + "\n No Segmentation Found at this address: ", DcmFilePathName)
-
                 dataset_segm.save_as(dcm_file)  # save to disk
 
 print("Patient Folder Segmentations Fixed:", patient_name)
