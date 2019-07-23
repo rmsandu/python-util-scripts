@@ -36,7 +36,7 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                     continue
                 for idx, tr in enumerate(trajectories):
                     single_tr = tr.Trajectory
-                    for el in single_tr:
+                    for idx_tr, el in enumerate(single_tr):
                         # do the source series mapping based on the seriesID from the XML PatientData
                         # match ablation and tumour segmentations based on the needle index
                         # ignore unique values
@@ -69,7 +69,7 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
 
                         dict_series_path_xml = {
                             "Timestamp": xmlobj.Eagles["time"],
-                            "NeedleIdx": idx,
+                            "NeedleIdx": idx_tr,
                             "SourceSeriesID": xmlobj.Eagles.PatientData["seriesID"],
                             "PathSeries": segmentation_path_series,
                             "SegmentationSeriesUID_xml": segmentation_series_uid,
@@ -78,20 +78,22 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                             "SphereRadius": sphere_radius
                         }
 
-                        if segmentation_series_uid and sphere_radius is not None:
+                        if segmentation_series_uid or sphere_radius is not None:
                             try:
-                                # if the ct series is not found in the dictionary, add it
-                                series_uid_found = next((item for item in list_segmentations_paths_xml if
-                                                         item["SegmentationSeriesUID_xml"] == segmentation_series_uid),
-                                                        None)
-                                sphere_radius = next(
-                                    (item for item in list_segmentations_paths_xml if item["SphereRadius"] == sphere_radius),
+                                # look if the SegmentationSeriesUID already exists in the dictionary
+                                path_series_found = next((item for item in list_segmentations_paths_xml if
+                                                          item["PathSeries"] == segmentation_path_series),
+                                                         None)
+                                sphere_radius_found = next(
+                                    (item for item in list_segmentations_paths_xml if
+                                     item["SphereRadius"] == sphere_radius),
                                     None)
                             except AttributeError:
                                 print('WTF')
                                 # print(list_segmentations_paths_xml)
-                            if series_uid_found is not None or sphere_radius is not None:
+                            if path_series_found is None or sphere_radius_found is None:
                                 # only add unique segmentations paths, skip duplicates
                                 list_segmentations_paths_xml.append(dict_series_path_xml)
+
 
         return list_segmentations_paths_xml
