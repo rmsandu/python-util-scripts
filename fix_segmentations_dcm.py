@@ -164,8 +164,6 @@ if __name__ == '__main__':
                     print(repr(e))
                     continue  # not a DICOM file
 
-                dataset_segm_series_no = dataset_segm.SeriesNumber
-                dataset_segm_series_uid = dataset_segm.SeriesInstanceUID
                 path_segmentations_idx = subdir.find("Segmentations")
                 path_segmentations_folder = subdir[path_segmentations_idx - 1:]
 
@@ -198,22 +196,25 @@ if __name__ == '__main__':
                 needle_idx_df_xml = df_segmentations_paths_xml.index[
                     df_segmentations_paths_xml["NeedleIdx"] == needle_idx].tolist()
 
-                idx_referenced_segm = [el for el in needle_idx_df_xml if el != needle_idx]
+                idx_referenced_segm = [el for el in needle_idx_df_xml if el != idx_segm_xml]
 
                 if len(idx_referenced_segm) > 1:
                     print('The SeriesInstanceUID for the segmentations is not unique at the following address: ',
                           DcmFilePathName)
                     sys.exit()
 
-                #%% get the path series instead of the segmentationseriesuid_xml
+                # %% get the path series instead of the segmentationseriesuid_xml
                 #  read the SeriesInstanceUID from the DICOM file (take the path)
                 ReferencedSOPInstanceUID_path = \
                     df_segmentations_paths_xml.loc[idx_referenced_segm[0]].PathSeries
 
-                referenced_dcm_file = subdir[0:len(subdir) - len(path_segmentations_folder)] +
-                                                   ReferencedSOPInstanceUID_path
+                referenced_dcm_dir = subdir[
+                                      0:len(subdir) - len(path_segmentations_folder)] + ReferencedSOPInstanceUID_path
+                segm_file = os.listdir(referenced_dcm_dir)[0]
+                # glob: take the first file from the folder
 
-                ReferencedSOPInstanceUID_ds = pydicom.read_file(referenced_dcm_file)
+                ReferencedSOPInstanceUID_ds = pydicom.read_file(os.path.join(referenced_dcm_dir, segm_file))
+
                 ReferencedSeriesInstanceUID_segm = ReferencedSOPInstanceUID_ds.SeriesInstanceUID
 
                 segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
