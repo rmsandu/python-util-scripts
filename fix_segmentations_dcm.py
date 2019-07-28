@@ -59,16 +59,18 @@ def add_general_reference_segmentation(dcm_segm,
 
 if __name__ == '__main__':
 
-    rootdir = r"C:\tmp_patients\Pat_MAV_B16"
-    patient_name = "MAV-BER-B16"
-    patient_id = "B16"
-    patient_dob = '1945' \
+    rootdir = r"C:\tmp_patients\Pat_MAV_BE_B04"
+    patient_name = "MAV-BER-B04"
+    patient_id = "B04"
+    patient_dob = '1946' \
                   '0101'
 
     # %% Change the Metatags of the Segmentations
+    series_no = 50  # take absurd series number for the segmentations
     for subdir, dirs, files in os.walk(rootdir):
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             k = 1
+            series_no += 1
             SeriesInstanceUID_segmentation = uid.generate_uid()  # generate a new series instance uid for each folder
             for file in sorted(files):
                 DcmFilePathName = os.path.join(subdir, file)
@@ -88,6 +90,7 @@ if __name__ == '__main__':
                 dataset_segm.SOPInstanceUID = uid.generate_uid()
                 dataset_segm.SeriesInstanceUID = SeriesInstanceUID_segmentation
                 dataset_segm.InstanceNumber = k
+                dataset_segm.SeriesNumber = series_no
                 k += 1  # increase the instance number
                 dataset_segm.save_as(dcm_file)  # save to disk
 
@@ -131,6 +134,15 @@ if __name__ == '__main__':
 
     df_ct_mapping = pd.DataFrame(list_all_ct_series)
 
+    # %% XML encoding and re-writing of the SeriesInstanceUID of the segmentations
+    for subdir, dirs, files in os.walk(rootdir):
+        for file in sorted(files):  # sort files by date of creation
+            fileName, fileExtension = os.path.splitext(file)
+            if fileExtension.lower().endswith('.xml'):
+                xmlFilePathName = os.path.join(subdir, file)
+                xmlfilename = os.path.normpath(xmlFilePathName)
+                encode_xml(xmlfilename, patient_id, patient_name, patient_dob, df_ct_mapping)
+
     # %% Create DF of CT Images and Segmentations SeriesInstanceUIDs based on the XML recordings
     list_segmentations_paths_xml = []
     for subdir, dirs, files in os.walk(rootdir):
@@ -150,16 +162,6 @@ if __name__ == '__main__':
     except KeyError:
         print('The TimeStamp Column in DataFrame is empty')
 
-    # %% XML encoding and re-writing of the SeriesInstanceUID of the segmentations
-    for subdir, dirs, files in os.walk(rootdir):
-        for file in sorted(files):  # sort files by date of creation
-            fileName, fileExtension = os.path.splitext(file)
-            if fileExtension.lower().endswith('.xml'):
-                xmlFilePathName = os.path.join(subdir, file)
-                xmlfilename = os.path.normpath(xmlFilePathName)
-                encode_xml(xmlfilename, patient_id, patient_name, patient_dob, df_ct_mapping,
-                           df_segmentations_paths_xml)
-
     # %% Edit each DICOM Segmentation File Individually by adding reference Source CT and the related segmentation
     for subdir, dirs, files in os.walk(rootdir):
         k = 1
@@ -173,10 +175,8 @@ if __name__ == '__main__':
                 except Exception as e:
                     print(repr(e))
                     continue  # not a DICOM file
-
                 path_segmentations_idx = subdir.find("Segmentations")
                 path_segmentations_folder = subdir[path_segmentations_idx - 1:]
-
                 try:
                     idx_segm_xml = df_segmentations_paths_xml.index[
                         df_segmentations_paths_xml["PathSeries"] == path_segmentations_folder].tolist()[0]
@@ -186,10 +186,10 @@ if __name__ == '__main__':
                 # get the timestamp value at the index of the identified segmentation series_uid both the Plan.xml (
                 # tumour path) and Ablation_Validation.xml (ablation) have the same starting time in the XML
                 # find the other segmentation with the matching start time != from the seriesinstanceuid read atm
-                needle_idx = df_segmentations_paths_xml.NeedleIdx[idx_segm_xml]
+                segm_instance_uid_val = df_segmentations_paths_xml.SegmentationSeriesUID_xml[idx_segm_xml]
+                needle_idx_val = df_segmentations_paths_xml.NeedleIdx[idx_segm_xml]
                 ReferencedSOPInstanceUID_src = \
                     df_segmentations_paths_xml.loc[idx_segm_xml].SourceSeriesID
-
                 # get the SeriesInstanceUID of the source CT from the XML files.
                 # 1) look for it in DF of the source CTs
                 # 2) get the corresponding StudyInstanceUID
@@ -202,7 +202,6 @@ if __name__ == '__main__':
                         series_number = df_segmentations_paths_xml.loc[idx_segm_xml].SeriesNumber
                         idx_series_source_study_instance_uid = df_ct_mapping.index[
                             df_ct_mapping['SeriesNumber'] == int(series_number)].tolist()
-
                     if len(idx_series_source_study_instance_uid) > 1:
                         print('The StudyInstanceUID for the segmentations is not unique at the following address: ',
                               DcmFilePathName)
@@ -210,11 +209,10 @@ if __name__ == '__main__':
                     StudyInstanceUID_src = df_ct_mapping.loc[idx_series_source_study_instance_uid[0]].StudyInstanceUID
 
                 except Exception as e:
-
                     print(repr(e))
 
                 needle_idx_df_xml = df_segmentations_paths_xml.index[
-                    df_segmentations_paths_xml["NeedleIdx"] == needle_idx].tolist()
+                    df_segmentations_paths_xml["NeedleIdx"] == needle_idx_val].tolist()
 
                 idx_referenced_segm = [el for el in needle_idx_df_xml if el != idx_segm_xml]
 
@@ -225,13 +223,22 @@ if __name__ == '__main__':
 
                 # %% get the path series instead of the segmentationseriesuid_xml
                 #  read the SeriesInstanceUID from the DICOM file (take the path)
-                ReferencedSOPInstanceUID_path = \
-                    df_segmentations_paths_xml.loc[idx_referenced_segm[0]].PathSeries
+                try:
+                    ReferencedSOPInstanceUID_path = \
+                        df_segmentations_paths_xml.loc[idx_referenced_segm[0]].PathSeries
+                except Exception:
+                    print(
+                        'Multiple Segmentations Folders Exist. '
+                        'A unique key mapping based on the timestamp as well needs to be implemented')
+                    sys.exit()
 
                 referenced_dcm_dir = subdir[
                                      0:len(subdir) - len(path_segmentations_folder)] + ReferencedSOPInstanceUID_path
-                segm_file = os.listdir(referenced_dcm_dir)[0]
-                # glob: take the first file from the folder
+                try:
+                    segm_file = os.listdir(referenced_dcm_dir)[0]
+                except FileNotFoundError:
+                    print('No Files have been followed at the specified address: ', referenced_dcm_dir)
+                    continue  # go back to the beginning of the loop
 
                 ReferencedSOPInstanceUID_ds = pydicom.read_file(os.path.join(referenced_dcm_dir, segm_file))
 
