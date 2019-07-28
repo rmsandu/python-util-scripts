@@ -57,13 +57,12 @@ def add_general_reference_segmentation(dcm_segm,
 
 # %%
 
-
 if __name__ == '__main__':
 
-    rootdir = r"C:\tmp_patients\Pat_MAV_BE_B04"
-    patient_name = "MAV-BER-B04"
-    patient_id = "B04"
-    patient_dob = '1946' \
+    rootdir = r"C:\tmp_patients\Pat_MAV_B16"
+    patient_name = "MAV-BER-B16"
+    patient_id = "B16"
+    patient_dob = '1945' \
                   '0101'
 
     # %% Change the Metatags of the Segmentations
@@ -85,28 +84,20 @@ if __name__ == '__main__':
                 dataset_segm.PatientBirthDate = patient_dob
                 dataset_segm.InstitutionName = "None"
                 dataset_segm.InstitutionAddress = "None"
-                # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
+                dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
                 dataset_segm.SOPInstanceUID = uid.generate_uid()
                 dataset_segm.SeriesInstanceUID = SeriesInstanceUID_segmentation
                 dataset_segm.InstanceNumber = k
                 k += 1  # increase the instance number
                 dataset_segm.save_as(dcm_file)  # save to disk
 
-    # %% XML encoding and re-writing of the SeriesInstanceUID of the segmentations
-    for subdir, dirs, files in os.walk(rootdir):
-        for file in sorted(files):  # sort files by date of creation
-            fileName, fileExtension = os.path.splitext(file)
-            if fileExtension.lower().endswith('.xml'):
-                xmlFilePathName = os.path.join(subdir, file)
-                xmlfilename = os.path.normpath(xmlFilePathName)
-                encode_xml(xmlfilename, patient_id, patient_name, patient_dob)
-
     # %% DICOM encoding
     list_all_ct_series = []
     for subdir, dirs, files in os.walk(rootdir):
         # study_0, study_1 case?
         path, foldername = os.path.split(subdir)
-        if 'Series_' in foldername:
+
+        if "Series" or "SegmentationNo" in foldername:
             # get the source image sequence attribute - SOPClassUID
             for file in sorted(files):
                 try:
@@ -122,15 +113,24 @@ if __name__ == '__main__':
                 # if the ct series is not found in the dictionary, add it
                 result = next((item for item in list_all_ct_series if
                                item["SeriesInstanceNumberUID"] == source_series_instance_uid), None)
+
+                path_segmentations_idx = subdir.find("Segmentations")
+                if path_segmentations_idx:
+                    path_segmentations_folder = subdir[path_segmentations_idx - 1:]
+                else:
+                    path_segmentations_folder = subdir
+
                 if result is None:
                     dict_series_folder = {"SeriesNumber": source_series_number,
                                           "SeriesInstanceNumberUID": source_series_instance_uid,
                                           "SOPClassUID": source_SOP_class_uid,
-                                          "StudyInstanceUID": source_study_instance_uid
+                                          "StudyInstanceUID": source_study_instance_uid,
+                                          "PathSeries": path_segmentations_folder
                                           }
                     list_all_ct_series.append(dict_series_folder)
 
     df_ct_mapping = pd.DataFrame(list_all_ct_series)
+
     # %% Create DF of CT Images and Segmentations SeriesInstanceUIDs based on the XML recordings
     list_segmentations_paths_xml = []
     for subdir, dirs, files in os.walk(rootdir):
@@ -149,6 +149,16 @@ if __name__ == '__main__':
             lambda x: x.split()[0])
     except KeyError:
         print('The TimeStamp Column in DataFrame is empty')
+
+    # %% XML encoding and re-writing of the SeriesInstanceUID of the segmentations
+    for subdir, dirs, files in os.walk(rootdir):
+        for file in sorted(files):  # sort files by date of creation
+            fileName, fileExtension = os.path.splitext(file)
+            if fileExtension.lower().endswith('.xml'):
+                xmlFilePathName = os.path.join(subdir, file)
+                xmlfilename = os.path.normpath(xmlFilePathName)
+                encode_xml(xmlfilename, patient_id, patient_name, patient_dob, df_ct_mapping,
+                           df_segmentations_paths_xml)
 
     # %% Edit each DICOM Segmentation File Individually by adding reference Source CT and the related segmentation
     for subdir, dirs, files in os.walk(rootdir):
@@ -183,15 +193,25 @@ if __name__ == '__main__':
                 # get the SeriesInstanceUID of the source CT from the XML files.
                 # 1) look for it in DF of the source CTs
                 # 2) get the corresponding StudyInstanceUID
-                idx_series_source_study_instance_uid = df_ct_mapping.index[
-                    df_ct_mapping['SeriesInstanceNumberUID'] == ReferencedSOPInstanceUID_src].tolist()
 
-                if len(idx_series_source_study_instance_uid) > 1:
-                    print('The StudyInstanceUID for the segmentations is not unique at the following address: ',
-                          DcmFilePathName)
-                    sys.exit()
+                try:
+                    idx_series_source_study_instance_uid = df_ct_mapping.index[
+                        df_ct_mapping['SeriesInstanceNumberUID'] == ReferencedSOPInstanceUID_src].tolist()
 
-                StudyInstanceUID_src = df_ct_mapping.loc[idx_series_source_study_instance_uid[0]].StudyInstanceUID
+                    if not idx_series_source_study_instance_uid:
+                        series_number = df_segmentations_paths_xml.loc[idx_segm_xml].SeriesNumber
+                        idx_series_source_study_instance_uid = df_ct_mapping.index[
+                            df_ct_mapping['SeriesNumber'] == int(series_number)].tolist()
+
+                    if len(idx_series_source_study_instance_uid) > 1:
+                        print('The StudyInstanceUID for the segmentations is not unique at the following address: ',
+                              DcmFilePathName)
+                        sys.exit()
+                    StudyInstanceUID_src = df_ct_mapping.loc[idx_series_source_study_instance_uid[0]].StudyInstanceUID
+
+                except Exception as e:
+
+                    print(repr(e))
 
                 needle_idx_df_xml = df_segmentations_paths_xml.index[
                     df_segmentations_paths_xml["NeedleIdx"] == needle_idx].tolist()
@@ -209,7 +229,7 @@ if __name__ == '__main__':
                     df_segmentations_paths_xml.loc[idx_referenced_segm[0]].PathSeries
 
                 referenced_dcm_dir = subdir[
-                                      0:len(subdir) - len(path_segmentations_folder)] + ReferencedSOPInstanceUID_path
+                                     0:len(subdir) - len(path_segmentations_folder)] + ReferencedSOPInstanceUID_path
                 segm_file = os.listdir(referenced_dcm_dir)[0]
                 # glob: take the first file from the folder
 

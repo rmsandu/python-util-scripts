@@ -43,10 +43,17 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                         # just loop until you find a not None value for both tumour and ablation at the same needle idx
                         try:
                             segmentation = el.Segmentation
-                            # todo: sphere case, what happens when no segmentation path available
+                            # todo: sphere case, what happens when no segmentation path availab
+                            #
+                            #
+                            #  le
                         except AttributeError:
                             # no segmentation found in this trajectory
                             continue  # go back to the beginning of the loop
+                        try:
+                            series_number = xmlobj.Eagles.PatientData["seriesNumber"]
+                        except AttributeError:
+                            series_number = None
                         try:
                             segmentation_series_uid = el.Segmentation.SeriesUID.cdata
                         except AttributeError:
@@ -61,7 +68,6 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                             type_of_segmentation = el.Segmentation["TypeOfSegmentation"]
                         except AttributeError:
                             type_of_segmentation = None
-
                         try:
                             sphere_radius = el.Segmentation["SphereRadius"]
                         except AttributeError:
@@ -75,7 +81,8 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                             "SegmentationSeriesUID_xml": segmentation_series_uid,
                             "SegmentLabel": el.Segmentation["StructureType"],
                             "TypeOfSegmentation": type_of_segmentation,
-                            "SphereRadius": sphere_radius
+                            "SphereRadius": sphere_radius,
+                            "SeriesNumber": series_number
                         }
 
                         if segmentation_series_uid or sphere_radius is not None:
@@ -94,6 +101,5 @@ def create_tumour_ablation_mapping(dir_xml_files, list_segmentations_paths_xml):
                             if path_series_found is None or sphere_radius_found is None:
                                 # only add unique segmentations paths, skip duplicates
                                 list_segmentations_paths_xml.append(dict_series_path_xml)
-
 
         return list_segmentations_paths_xml
