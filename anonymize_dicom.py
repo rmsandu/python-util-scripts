@@ -13,10 +13,10 @@ from anonymization_xml_logs import encode_xml
 
 if __name__ == '__main__':
 
-    rootdir = r"C:\tmp_patients\Pat_M02_195004050117\Study_840\Series_12"
-    patient_name = "MAV-STO-M02"
-    patient_id = "M02"
-    patient_dob = '19500101'
+    rootdir = r"C:\tmp_patients\Pat_MAV_GRON_G01"
+    patient_name = "MAV-GRON-G01"
+    patient_id = "G01"
+    patient_dob = '19540101'
     #%% XML encoding
     for subdir, dirs, files in os.walk(rootdir):
 
