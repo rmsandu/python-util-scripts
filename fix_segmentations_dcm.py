@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 dataset_segm.PatientBirthDate = patient_dob
                 dataset_segm.InstitutionName = "None"
                 dataset_segm.InstitutionAddress = "None"
-                dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
+                # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
                 dataset_segm.SOPInstanceUID = uid.generate_uid()
                 dataset_segm.SeriesInstanceUID = SeriesInstanceUID_segmentation
                 dataset_segm.InstanceNumber = k
@@ -115,7 +115,10 @@ if __name__ == '__main__':
                     # not dicom file so continue until you find one
                     continue
                 source_series_instance_uid = dataset_source_ct.SeriesInstanceUID
-                source_study_instance_uid = dataset_source_ct.StudyInstanceUID
+                try:
+                    source_study_instance_uid = dataset_source_ct.StudyInstanceUID
+                except Exception:
+                    source_study_instance_uid = None
                 source_series_number = dataset_source_ct.SeriesNumber
                 source_SOP_class_uid = dataset_source_ct.SOPClassUID
                 # if the ct series is not found in the dictionary, add it
@@ -230,29 +233,36 @@ if __name__ == '__main__':
 
                 # %% get the path series instead of the segmentationseriesuid_xml
                 #  read the SeriesInstanceUID from the DICOM file (take the path)
-                try:
+                if idx_referenced_segm:
                     ReferencedSOPInstanceUID_path = \
                         df_segmentations_paths_xml.loc[idx_referenced_segm[0]].PathSeries
-                except Exception:
-                    print(
-                        'Multiple Segmentations Folders Exist. '
-                        'A unique key mapping based on the timestamp as well needs to be implemented')
+                elif len(idx_referenced_segm) > 1:
+                    print('Multiple Segmentation Folders present.,'
+                          'Please clean ')
                     sys.exit()
+                else:
+                    ReferencedSOPInstanceUID_path = None
+                    # print(
+                    #     'Either the tumor or ablation segmentation file is not present. '
+                    #     'Ablation CT scan might be missing or Tumor might be invisible.')
+                if ReferencedSOPInstanceUID_path is None:
+                    segment_label = 0
+                    lesion_number = 0
+                    ReferencedSOPInstanceUID_ds = "None"
+                    ReferencedSeriesInstanceUID_segm = "None"
+                else:
+                    referenced_dcm_dir = subdir[
+                                         0:len(subdir) - len(path_segmentations_folder)] + ReferencedSOPInstanceUID_path
+                    try:
+                        segm_file = os.listdir(referenced_dcm_dir)[0]
+                    except FileNotFoundError:
+                        print('No Files have been followed at the specified address: ', referenced_dcm_dir)
+                        continue  # go back to the beginning of the loop
 
-                referenced_dcm_dir = subdir[
-                                     0:len(subdir) - len(path_segmentations_folder)] + ReferencedSOPInstanceUID_path
-                try:
-                    segm_file = os.listdir(referenced_dcm_dir)[0]
-                except FileNotFoundError:
-                    print('No Files have been followed at the specified address: ', referenced_dcm_dir)
-                    continue  # go back to the beginning of the loop
-
-                ReferencedSOPInstanceUID_ds = pydicom.read_file(os.path.join(referenced_dcm_dir, segm_file))
-
-                ReferencedSeriesInstanceUID_segm = ReferencedSOPInstanceUID_ds.SeriesInstanceUID
-
-                segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
-                lesion_number = df_segmentations_paths_xml.loc[idx_segm_xml].NeedleIdx + 1
+                    ReferencedSOPInstanceUID_ds = pydicom.read_file(os.path.join(referenced_dcm_dir, segm_file))
+                    ReferencedSeriesInstanceUID_segm = ReferencedSOPInstanceUID_ds.SeriesInstanceUID
+                    segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
+                    lesion_number = df_segmentations_paths_xml.loc[idx_segm_xml].NeedleIdx + 1
 
                 # call function to change the segmentation uid
                 dataset_segm = add_general_reference_segmentation(dataset_segm,
