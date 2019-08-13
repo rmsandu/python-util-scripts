@@ -61,7 +61,7 @@ def encode_xml(filename, patient_id, patient_name, patient_dob,  df_ct_mapping):
         series_instance_uid = df_ct_mapping.loc[idx_segm_xml].SeriesInstanceNumberUID
         for el in segmentation:
             if el.tag == 'SeriesUID':
-                el.text = series_instance_uid  
+                el.text = series_instance_uid
 
     # re-write the XML and save it
     xmlobj.write(filename)
