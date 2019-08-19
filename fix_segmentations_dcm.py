@@ -8,6 +8,7 @@ Created on June 06th 2019
 import os
 import sys
 import pydicom
+import argparse
 import pandas as pd
 from pydicom import uid
 from pydicom.sequence import Sequence
@@ -64,15 +65,15 @@ def add_general_reference_segmentation(dcm_segm,
 
 if __name__ == '__main__':
 
-    rootdir = r"C:\tmp_patients\Pat_MAV_BE_B01_"
-    patient_name = "MAV-BER-B01"
-    patient_id = "MAV-B01"
-    patient_dob = '1942' \
-                  '0101'
-
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-i", "--rootdir", required=True, help="input patient folder path to be processed")
+    ap.add_argument("-n", "--patient_name", required=True, help="patient name to be encoded into the files. eg: MAV-STO-M03")
+    ap.add_argument("-u", "--patient_id", required=True, help="patient id to be encoded into the files. eg: MAV-M03")
+    ap.add_argument("-d", "--patient_dob", required=True, help="patient date of birth in format eg: 19380101")
+    args = vars(ap.parse_args())
     # %% Change the Metatags of the Segmentations
     series_no = 50  # take absurd series number for the segmentations
-    for subdir, dirs, files in os.walk(rootdir):
+    for subdir, dirs, files in os.walk(args["rootdir"]):
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             k = 1
             series_no += 1
@@ -86,9 +87,9 @@ if __name__ == '__main__':
                     print(repr(e))
                     continue  # not a DICOM file
                 # next lines will be executed only if the file is DICOM
-                dataset_segm.PatientName = patient_name
-                dataset_segm.PatientID = patient_id
-                dataset_segm.PatientBirthDate = patient_dob
+                dataset_segm.PatientName = args["patient-name"]
+                dataset_segm.PatientID = args["patient-id"]
+                dataset_segm.PatientBirthDate = args["patient-dob"]
                 dataset_segm.InstitutionName = "None"
                 dataset_segm.InstitutionAddress = "None"
                 # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
@@ -143,17 +144,17 @@ if __name__ == '__main__':
     df_ct_mapping = pd.DataFrame(list_all_ct_series)
 
     # %% XML encoding and re-writing of the SeriesInstanceUID of the segmentations
-    for subdir, dirs, files in os.walk(rootdir):
+    for subdir, dirs, files in os.walk(args["rootdir"]):
         for file in sorted(files):  # sort files by date of creation
             fileName, fileExtension = os.path.splitext(file)
             if fileExtension.lower().endswith('.xml'):
                 xmlFilePathName = os.path.join(subdir, file)
                 xmlfilename = os.path.normpath(xmlFilePathName)
-                encode_xml(xmlfilename, patient_id, patient_name, patient_dob, df_ct_mapping)
+                encode_xml(xmlfilename, args["patient-id"], args["patient_name"], args["patient_dob"], df_ct_mapping)
 
     # %% Create DF of CT Images and Segmentations SeriesInstanceUIDs based on the XML recordings
     list_segmentations_paths_xml = []
-    for subdir, dirs, files in os.walk(rootdir):
+    for subdir, dirs, files in os.walk(args["rootdir"]):
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             path_segmentations, foldername = os.path.split(subdir)
             path_recordings, foldername = os.path.split(path_segmentations)
@@ -171,7 +172,7 @@ if __name__ == '__main__':
         print('The TimeStamp Column in DataFrame is empty')
 
     # %% Edit each DICOM Segmentation File Individually by adding reference Source CT and the related segmentation
-    for subdir, dirs, files in os.walk(rootdir):
+    for subdir, dirs, files in os.walk(argparse["rootdir"]):
         k = 1
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             SeriesInstanceUID_segmentation = uid.generate_uid()  # generate a new series instance uid for each folder
@@ -273,4 +274,5 @@ if __name__ == '__main__':
                                                                   lesion_number)
                 dataset_segm.save_as(dcm_file)  # save to disk
 
-print("Patient Folder Segmentations Fixed:", patient_name)
+print("Patient Folder Segmentations Fixed:", argparse["patient-name"])
+
