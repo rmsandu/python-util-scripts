@@ -1,7 +1,14 @@
 import os
 
 #%%
+
+
 def splitall(path):
+    """
+
+    :param path: file path
+    :return:  a list of all the folders within the path
+    """
     allparts = []
     while 1:
         parts = os.path.split(path)
