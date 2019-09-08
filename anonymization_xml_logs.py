@@ -4,6 +4,7 @@ Created on June 06th 2019
 
 @author: Raluca Sandu
 """
+import os
 import numpy as np
 import untangle as ut
 import xml.etree.ElementTree as ET
@@ -16,7 +17,7 @@ def encode_xml(filename, patient_id, patient_name, patient_dob,  df_ct_mapping):
     :param patient_id:
     :param patient_name:
     :param patient_dob:
-    :param SeriesInstanceUID:
+    :param df_ct_mapping:
     :return:
     """
     try:
@@ -65,3 +66,14 @@ def encode_xml(filename, patient_id, patient_name, patient_dob,  df_ct_mapping):
 
     # re-write the XML and save it
     xmlobj.write(filename)
+
+
+def main_encode_xml(rootdir, patient_id, patient_name, patient_dob, df_ct_mapping):
+    for subdir, dirs, files in os.walk(rootdir):
+        for file in sorted(files):  # sort files by date of creation
+            fileName, fileExtension = os.path.splitext(file)
+            if fileExtension.lower().endswith('.xml'):
+                xmlFilePathName = os.path.join(subdir, file)
+                xmlfilename = os.path.normpath(xmlFilePathName)
+                encode_xml(xmlfilename, patient_id, patient_name, patient_dob, df_ct_mapping)
+                # encode_xml(xmlfilename, args["patient_id"], args["patient_name"], args["patient_dob"], df_ct_mapping)
