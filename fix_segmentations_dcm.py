@@ -13,11 +13,11 @@ import pandas as pd
 from pydicom import uid
 from pydicom.sequence import Sequence
 from pydicom.dataset import Dataset
-from anonymization_xml_logs import encode_xml
+import anonymization_xml_logs
 from extract_segm_paths_xml import create_tumour_ablation_mapping
 
 
-def add_general_reference_segmentation(dcm_segm,
+def add_general_reference_segmentation(dataset_segm,
                                        ReferencedSeriesInstanceUID_segm,
                                        ReferencedSOPInstanceUID_src,
                                        StudyInstanceUID_src,
@@ -26,7 +26,7 @@ def add_general_reference_segmentation(dcm_segm,
                                        ):
     """
     Add Reference to the tumour/ablation and source img in the DICOM segmentation metatags. 
-    :param dcm_segm: dcm file read with pydicom library
+    :param dataset_segm: dcm file read with pydicom library
     :param ReferencedSOPInstanceUID_segm: SeriesInstanceUID of the related segmentation file (tumour or ablation)
     :param ReferencedSOPInstanceUID_src: SeriesInstanceUID of the source image
     :param StudyInstanceUID_src: StudyInstanceUID of the source image
@@ -58,22 +58,12 @@ def add_general_reference_segmentation(dcm_segm,
     dataset_segm.ReferencedImageSequence = Sequence([Segm_ds])
     dataset_segm.SourceImageSequence = Sequence([Source_ds])
 
-    return dcm_segm
+    return dataset_segm
 
 
-# %%
-
-if __name__ == '__main__':
-
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-i", "--rootdir", required=True, help="input patient folder path to be processed")
-    ap.add_argument("-n", "--patient_name", required=True, help="patient name to be encoded into the files. eg: MAV-STO-M03")
-    ap.add_argument("-u", "--patient_id", required=True, help="patient id to be encoded into the files. eg: MAV-M03")
-    ap.add_argument("-d", "--patient_dob", required=True, help="patient date of birth in format eg: 19380101")
-    args = vars(ap.parse_args())
-    # %% Change the Metatags of the Segmentations
+def encode_dcm_tags(rootdir, patient_name, patient_id, patient_dob):
     series_no = 50  # take absurd series number for the segmentations
-    for subdir, dirs, files in os.walk(args["rootdir"]):
+    for subdir, dirs, files in os.walk(rootdir):
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             k = 1
             series_no += 1
@@ -87,9 +77,9 @@ if __name__ == '__main__':
                     print(repr(e))
                     continue  # not a DICOM file
                 # next lines will be executed only if the file is DICOM
-                dataset_segm.PatientName = args["patient-name"]
-                dataset_segm.PatientID = args["patient-id"]
-                dataset_segm.PatientBirthDate = args["patient-dob"]
+                dataset_segm.PatientName = patient_name
+                dataset_segm.PatientID = patient_id
+                dataset_segm.PatientBirthDate = patient_dob
                 dataset_segm.InstitutionName = "None"
                 dataset_segm.InstitutionAddress = "None"
                 # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
@@ -100,7 +90,8 @@ if __name__ == '__main__':
                 k += 1  # increase the instance number
                 dataset_segm.save_as(dcm_file)  # save to disk
 
-    # %% DICOM encoding
+
+def create_dict_paths_series_dcm(rootdir):
     list_all_ct_series = []
     for subdir, dirs, files in os.walk(rootdir):
         # study_0, study_1 case?
@@ -140,28 +131,23 @@ if __name__ == '__main__':
                                           "PathSeries": path_segmentations_folder
                                           }
                     list_all_ct_series.append(dict_series_folder)
+    return list_all_ct_series
 
-    df_ct_mapping = pd.DataFrame(list_all_ct_series)
 
-    # %% XML encoding and re-writing of the SeriesInstanceUID of the segmentations
-    for subdir, dirs, files in os.walk(args["rootdir"]):
-        for file in sorted(files):  # sort files by date of creation
-            fileName, fileExtension = os.path.splitext(file)
-            if fileExtension.lower().endswith('.xml'):
-                xmlFilePathName = os.path.join(subdir, file)
-                xmlfilename = os.path.normpath(xmlFilePathName)
-                encode_xml(xmlfilename, args["patient-id"], args["patient_name"], args["patient_dob"], df_ct_mapping)
+def create_dict_paths_series_xml(rootdir):
+    """
 
-    # %% Create DF of CT Images and Segmentations SeriesInstanceUIDs based on the XML recordings
+    :param rootdir:
+    :return:
+    """
     list_segmentations_paths_xml = []
-    for subdir, dirs, files in os.walk(args["rootdir"]):
+    for subdir, dirs, files in os.walk(rootdir):
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
             path_segmentations, foldername = os.path.split(subdir)
             path_recordings, foldername = os.path.split(path_segmentations)
             dict_segmentations_paths_xml = \
                 create_tumour_ablation_mapping(path_recordings, list_segmentations_paths_xml)
     df_segmentations_paths_xml = pd.DataFrame(list_segmentations_paths_xml)
-
     # check if the dataframe is empty, exit the script if true
     if df_segmentations_paths_xml.empty:
         sys.exit("No Segmentations Paths found in the XML Cas-Recordings")
@@ -170,12 +156,20 @@ if __name__ == '__main__':
             lambda x: x.split()[0])
     except KeyError:
         print('The TimeStamp Column in DataFrame is empty')
+    return df_segmentations_paths_xml
 
-    # %% Edit each DICOM Segmentation File Individually by adding reference Source CT and the related segmentation
-    for subdir, dirs, files in os.walk(argparse["rootdir"]):
+
+def main_add_reference_tags_dcm(rootdir, df_ct_mapping, df_segmentations_paths_xml):
+    """
+
+    :param rootdir:
+    :param df_segmentations_paths_xml:
+    :param df_ct_mapping:
+    :return:
+    """
+    for subdir, dirs, files in os.walk(rootdir):
         k = 1
         if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
-            SeriesInstanceUID_segmentation = uid.generate_uid()  # generate a new series instance uid for each folder
             for file in sorted(files):
                 DcmFilePathName = os.path.join(subdir, file)
                 try:
@@ -202,7 +196,6 @@ if __name__ == '__main__':
                 # get the SeriesInstanceUID of the source CT from the XML files.
                 # 1) look for it in DF of the source CTs
                 # 2) get the corresponding StudyInstanceUID
-
                 try:
                     idx_series_source_study_instance_uid = df_ct_mapping.index[
                         df_ct_mapping['SeriesInstanceNumberUID'] == ReferencedSOPInstanceUID_src].tolist()
@@ -243,9 +236,6 @@ if __name__ == '__main__':
                     sys.exit()
                 else:
                     ReferencedSOPInstanceUID_path = None
-                    # print(
-                    #     'Either the tumor or ablation segmentation file is not present. '
-                    #     'Ablation CT scan might be missing or Tumor might be invisible.')
                 if ReferencedSOPInstanceUID_path is None:
                     segment_label = 0
                     lesion_number = 0
@@ -274,5 +264,65 @@ if __name__ == '__main__':
                                                                   lesion_number)
                 dataset_segm.save_as(dcm_file)  # save to disk
 
-print("Patient Folder Segmentations Fixed:", argparse["patient-name"])
+# %%
+
+
+if __name__ == '__main__':
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-i", "--rootdir", required=False, help="input single patient folder path to be processed")
+    ap.add_argument("-n", "--patient_name", required=False, help="patient name to be encoded into the files. eg: MAV-STO-M03")
+    ap.add_argument("-u", "--patient_id", required=False, help="patient id to be encoded into the files. eg: MAV-M03")
+    ap.add_argument("-d", "--patient_dob", required=False, help="patient date of birth in format eg: 19380101")
+    ap.add_argument("-b", "--input_batch_proc", required=False, help="input csv file for batch processing")
+    args = vars(ap.parse_args())
+    if args["patient_name"] is not None:
+        print("Patient Name:", args["patient_name"])
+        print("Patient ID:", args["patient_id"])
+        print("Patient date-of-birth:", args["patient_dob"])
+        print("Rootdir:", args['rootdir'])
+    elif args["input_batch_proc"] is not None:
+        print("Batch Processing Enabled, path to csv: ", args["input_batch_proc"])
+    else:
+        print("no input values provided either for single patient processing or batch processing. System Exiting")
+        sys.exit()
+        # in case of  batch processing loop through the csv for each patient folder
+    # %% Change the Metatags of the Segmentations and the XMLs
+    if args["input_batch_proc"] is not None:
+        # iterate through each patient and send the root dir filepath
+        df = pd.read_excel(args["input_batch_proc"])
+        for idx in range(len(df)):
+            patient_id = df["Patient ID"].iloc[idx]
+            patient_dob = df['Date-of-Birth'].iloc[idx]
+            patient_name = df['Patient Name'].iloc[idx]
+            patient_dir_paths = df['Patient_Dir_Paths'].iloc[idx]
+            # path_edited = os.path.abspath(patient_dir_paths).split("[")[1].split("]")[0]
+            if patient_dir_paths is None:
+                continue
+            else:
+                for rootdir in patient_dir_paths:
+                    rootdir = os.path.normpath(rootdir)
+                    # for each patient folder associated with a patient encode the DCM and the XML
+                    encode_dcm_tags(rootdir, patient_name, patient_id, patient_dob)
+                    # create dictionary of filepaths and SeriesUIDs
+                    list_all_ct_series = create_dict_paths_series_dcm(rootdir)
+                    df_ct_mapping = pd.DataFrame(list_all_ct_series)
+                    # XML encoding
+                    anonymization_xml_logs.main_encode_xml(rootdir, patient_id, patient_name, patient_dob, df_ct_mapping)
+                    # create dict of xml and dicom paths
+                    df_segmentations_paths_xml = create_dict_paths_series_xml(rootdir)
+                    # Edit each DICOM Segmentation File  by adding reference Source CT and the related segmentation
+                    main_add_reference_tags_dcm(rootdir, df_ct_mapping, df_segmentations_paths_xml)
+                    print("Patient Folder Segmentations Fixed:", patient_name)
+
+    else:
+        # single patient folder
+        # TODO: conditions for single patient folder
+        encode_dcm_tags(args["rootdir"], args["patient_name"], args["patient_id"], args["patient_dob"])
+        print("Patient Folder Segmentations Fixed:", args["patient_name"])
+
+
+
+
+
 
