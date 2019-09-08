@@ -11,6 +11,8 @@ import pydicom
 import argparse
 import pandas as pd
 from pydicom import uid
+from ast import literal_eval
+import pathlib
 from pydicom.sequence import Sequence
 from pydicom.dataset import Dataset
 import anonymization_xml_logs
@@ -79,7 +81,7 @@ def encode_dcm_tags(rootdir, patient_name, patient_id, patient_dob):
                 # next lines will be executed only if the file is DICOM
                 dataset_segm.PatientName = patient_name
                 dataset_segm.PatientID = patient_id
-                dataset_segm.PatientBirthDate = patient_dob
+                # dataset_segm.PatientBirthDate = patient_dob
                 dataset_segm.InstitutionName = "None"
                 dataset_segm.InstitutionAddress = "None"
                 # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
@@ -291,11 +293,27 @@ if __name__ == '__main__':
     if args["input_batch_proc"] is not None:
         # iterate through each patient and send the root dir filepath
         df = pd.read_excel(args["input_batch_proc"])
+        # df['Patient_Dir_Paths']=df['Patient_Dir_Paths'].apply(lambda x: x.strip(["[", "]"]))
+        # df['Patient_Dir_Paths'].dropna(inplace=True)
+        df['Patient_Dir_Paths'].fillna("[]", inplace=True)
+        # df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(lambda x: x.replace("[", ""))
+        # df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(lambda x: x.replace("]", ""))
+        # df.rename(columns={'Patient_Dir_Paths': 'col1'}, inplace=True)
+            # df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(pd.Series)
+
+        # df2 = pd.DataFrame(df.explode('Patient_Dir_Paths'))
+        # df.Patient_Dir_Paths = df.Patient_Dir_Paths.astype(str)
+        df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(literal_eval)
+        # df2.Patient_Dir_Paths = df2.Patient_Dir_Paths.apply(pathlib.Path)
+
+        # df2.dropna(inplace=True)
         for idx in range(len(df)):
             patient_id = df["Patient ID"].iloc[idx]
             patient_dob = df['Date-of-Birth'].iloc[idx]
             patient_name = df['Patient Name'].iloc[idx]
-            patient_dir_paths = df['Patient_Dir_Paths'].iloc[idx]
+            patient_dir_paths = df.Patient_Dir_Paths[idx]
+            print(patient_dir_paths)
+            # TODO: extract the path
             # path_edited = os.path.abspath(patient_dir_paths).split("[")[1].split("]")[0]
             if patient_dir_paths is None:
                 continue
