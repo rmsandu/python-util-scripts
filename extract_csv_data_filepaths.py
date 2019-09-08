@@ -36,7 +36,7 @@ df["Patient Name"] = df["Patient Name"].map(lambda x: x.partition("-L")[0])
 df["Date-of-Birth"] = df["Date-of-Birth"].map(lambda x: str(x)+"0101")
 
 # iterate for each patient id from  the excel and look for substring in the list of dir_paths
-dir_paths = [os.path.abspath(x) for x in os.listdir(input_dir)]
+dir_paths = [os.path.join(input_dir, x) for x in os.listdir(input_dir)]
 patient_ids = df["Patient ID"].tolist()
 path_patient_dir_col = []
 for patient_id in patient_ids:
