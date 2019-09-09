@@ -81,7 +81,7 @@ def encode_dcm_tags(rootdir, patient_name, patient_id, patient_dob):
                 # next lines will be executed only if the file is DICOM
                 dataset_segm.PatientName = patient_name
                 dataset_segm.PatientID = patient_id
-                # dataset_segm.PatientBirthDate = patient_dob
+                dataset_segm.PatientBirthDate = patient_dob
                 dataset_segm.InstitutionName = "None"
                 dataset_segm.InstitutionAddress = "None"
                 # dataset_segm.SliceLocation = dataset_segm.ImagePositionPatient[2]
@@ -306,15 +306,11 @@ if __name__ == '__main__':
         df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(literal_eval)
         # df2.Patient_Dir_Paths = df2.Patient_Dir_Paths.apply(pathlib.Path)
 
-        # df2.dropna(inplace=True)
         for idx in range(len(df)):
-            patient_id = df["Patient ID"].iloc[idx]
-            patient_dob = df['Date-of-Birth'].iloc[idx]
-            patient_name = df['Patient Name'].iloc[idx]
+            patient_id = str(df["Patient ID"].iloc[idx])
+            patient_dob = str(df['Date-of-Birth'].iloc[idx])
+            patient_name = str(df['Patient Name'].iloc[idx])
             patient_dir_paths = df.Patient_Dir_Paths[idx]
-            print(patient_dir_paths)
-            # TODO: extract the path
-            # path_edited = os.path.abspath(patient_dir_paths).split("[")[1].split("]")[0]
             if patient_dir_paths is None:
                 continue
             else:
