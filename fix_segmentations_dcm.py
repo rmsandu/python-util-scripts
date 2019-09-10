@@ -66,7 +66,7 @@ def add_general_reference_segmentation(dataset_segm,
 def encode_dcm_tags(rootdir, patient_name, patient_id, patient_dob):
     series_no = 50  # take absurd series number for the segmentations
     for subdir, dirs, files in os.walk(rootdir):
-        if 'Segmentations' in subdir and 'SeriesNo_' in subdir:
+        if ('Segmentations' in subdir) and ('SeriesNo_' in subdir):
             k = 1
             series_no += 1
             SeriesInstanceUID_segmentation = uid.generate_uid()  # generate a new series instance uid for each folder
@@ -99,7 +99,7 @@ def create_dict_paths_series_dcm(rootdir):
         # study_0, study_1 case?
         path, foldername = os.path.split(subdir)
 
-        if "Series" or "SegmentationNo" in foldername:
+        if ("Series" in foldername) or ("SegmentationNo" in foldername):
             # get the source image sequence attribute - SOPClassUID
             for file in sorted(files):
                 try:
@@ -120,7 +120,7 @@ def create_dict_paths_series_dcm(rootdir):
                                item["SeriesInstanceNumberUID"] == source_series_instance_uid), None)
 
                 path_segmentations_idx = subdir.find("Segmentations")
-                if path_segmentations_idx:
+                if path_segmentations_idx != -1:
                     path_segmentations_folder = subdir[path_segmentations_idx - 1:]
                 else:
                     path_segmentations_folder = subdir
@@ -251,12 +251,10 @@ def main_add_reference_tags_dcm(rootdir, df_ct_mapping, df_segmentations_paths_x
                     except FileNotFoundError:
                         print('No Files have been followed at the specified address: ', referenced_dcm_dir)
                         continue  # go back to the beginning of the loop
-
                     ReferencedSOPInstanceUID_ds = pydicom.read_file(os.path.join(referenced_dcm_dir, segm_file))
                     ReferencedSeriesInstanceUID_segm = ReferencedSOPInstanceUID_ds.SeriesInstanceUID
                     segment_label = df_segmentations_paths_xml.loc[idx_segm_xml].SegmentLabel
                     lesion_number = df_segmentations_paths_xml.loc[idx_segm_xml].NeedleIdx + 1
-
                 # call function to change the segmentation uid
                 dataset_segm = add_general_reference_segmentation(dataset_segm,
                                                                   ReferencedSeriesInstanceUID_segm,
@@ -293,19 +291,8 @@ if __name__ == '__main__':
     if args["input_batch_proc"] is not None:
         # iterate through each patient and send the root dir filepath
         df = pd.read_excel(args["input_batch_proc"])
-        # df['Patient_Dir_Paths']=df['Patient_Dir_Paths'].apply(lambda x: x.strip(["[", "]"]))
-        # df['Patient_Dir_Paths'].dropna(inplace=True)
         df['Patient_Dir_Paths'].fillna("[]", inplace=True)
-        # df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(lambda x: x.replace("[", ""))
-        # df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(lambda x: x.replace("]", ""))
-        # df.rename(columns={'Patient_Dir_Paths': 'col1'}, inplace=True)
-            # df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(pd.Series)
-
-        # df2 = pd.DataFrame(df.explode('Patient_Dir_Paths'))
-        # df.Patient_Dir_Paths = df.Patient_Dir_Paths.astype(str)
         df['Patient_Dir_Paths'] = df['Patient_Dir_Paths'].apply(literal_eval)
-        # df2.Patient_Dir_Paths = df2.Patient_Dir_Paths.apply(pathlib.Path)
-
         for idx in range(len(df)):
             patient_id = str(df["Patient ID"].iloc[idx])
             patient_dob = str(df['Date-of-Birth'].iloc[idx])
