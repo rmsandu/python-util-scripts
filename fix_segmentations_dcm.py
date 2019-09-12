@@ -318,9 +318,20 @@ if __name__ == '__main__':
 
     else:
         # single patient folder
-        # TODO: conditions for single patient folder
+        # TODO: test the condition for single patient folder
         encode_dcm_tags(args["rootdir"], args["patient_name"], args["patient_id"], args["patient_dob"])
         print("Patient Folder Segmentations Fixed:", args["patient_name"])
+        list_all_ct_series = create_dict_paths_series_dcm(args["rootdir"])
+        df_ct_mapping = pd.DataFrame(list_all_ct_series)
+        # XML encoding
+        anonymization_xml_logs.main_encode_xml(args["rootdir"], args["patient_id"], args["patient_name"],
+                                               args["patient_dob"], df_ct_mapping)
+        # create dict of xml and dicom paths
+        df_segmentations_paths_xml = create_dict_paths_series_xml(args["rootdir"])
+        # Edit each DICOM Segmentation File  by adding reference Source CT and the related segmentation
+        main_add_reference_tags_dcm(args["rootdir"], df_ct_mapping, df_segmentations_paths_xml)
+        print("Patient Folder Segmentations Fixed:", args["patient_name"])
+
 
 
 
