@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 
 def encode_xml(filename, patient_id, patient_name, patient_dob,  df_ct_mapping):
     """
-    Remove the identifying information from the XML files. Update the SeriesInstanceUID
+    Remove the identifying information from the XML files. Update the SeriesInstanceUID after modifying the corrupt DICOM
     :param filename:
     :param patient_id:
     :param patient_name:
@@ -69,6 +69,15 @@ def encode_xml(filename, patient_id, patient_name, patient_dob,  df_ct_mapping):
 
 
 def main_encode_xml(rootdir, patient_id, patient_name, patient_dob, df_ct_mapping):
+    """
+
+    :param rootdir:
+    :param patient_id:
+    :param patient_name:
+    :param patient_dob:
+    :param df_ct_mapping:
+    :return:
+    """
     for subdir, dirs, files in os.walk(rootdir):
         for file in sorted(files):  # sort files by date of creation
             fileName, fileExtension = os.path.splitext(file)
@@ -76,4 +85,4 @@ def main_encode_xml(rootdir, patient_id, patient_name, patient_dob, df_ct_mappin
                 xmlFilePathName = os.path.join(subdir, file)
                 xmlfilename = os.path.normpath(xmlFilePathName)
                 encode_xml(xmlfilename, patient_id, patient_name, patient_dob, df_ct_mapping)
-                # encode_xml(xmlfilename, args["patient_id"], args["patient_name"], args["patient_dob"], df_ct_mapping)
+
