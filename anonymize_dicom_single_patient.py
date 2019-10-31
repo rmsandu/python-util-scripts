@@ -5,11 +5,12 @@ Created on June 2019
 @author: Raluca Sandu
 """
 import os
+
 import pydicom
-from pydicom import uid
-import xml.etree.ElementTree as ET
+
 from anonymization_xml_logs import encode_xml
-#%%
+
+# %%
 
 if __name__ == '__main__':
 
@@ -17,7 +18,7 @@ if __name__ == '__main__':
     patient_name = "MAV-GRON-G01"
     patient_id = "G01"
     patient_dob = '19540101'
-    #%% XML encoding
+    # %% XML encoding
     for subdir, dirs, files in os.walk(rootdir):
 
         for file in sorted(files):  # sort files by date of creation
@@ -28,7 +29,7 @@ if __name__ == '__main__':
                 xmlfilename = os.path.normpath(xmlFilePathName)
                 encode_xml(xmlfilename, patient_id, patient_name, patient_dob)
 
-    #%% DICOM encoding
+    # %% DICOM encoding
     for subdir, dirs, files in os.walk(rootdir):
         for file in sorted(files):  # sort files by date of creation
             DcmFilePathName = os.path.join(subdir, file)
@@ -47,5 +48,3 @@ if __name__ == '__main__':
                 print("Cannot parse this file as DICOM:", DcmFilePathName + " - " + repr(e))
 
 print("Patient Folder Segmentations Encoded:", patient_name)
-
-

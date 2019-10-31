@@ -34,7 +34,7 @@ def anonymize_all_dcm_files(rootdir, patient_name, patient_id, patient_dob):
                 dcm_file = os.path.normpath(DcmFilePathName)
                 dataset = pydicom.read_file(dcm_file)
             except Exception as e:
-                print(repr(e))
+                # print(repr(e))
                 continue  # not a DICOM file
             dataset.PatientName = patient_name
             dataset.PatientID = patient_id
