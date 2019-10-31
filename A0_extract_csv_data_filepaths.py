@@ -11,10 +11,10 @@ Unique key: key = [Patient_ID, Treatment_ID, Lesion_ID]
 TREATMENT_ID can be ablation date
 """
 
-import os
 import argparse
-import pandas as pd
+import os
 
+import pandas as pd
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--input_dir", required=True, help="input patient folder path to be processed")

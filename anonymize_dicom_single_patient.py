@@ -14,8 +14,8 @@ from anonymization_xml_logs import encode_xml
 
 if __name__ == '__main__':
 
-    rootdir = r"C:\tmp_patients\Pat_MAV_GRON_G01"
-    patient_name = "MAV-GRON-G01"
+    rootdir = r""
+    patient_name = "G01"
     patient_id = "G01"
     patient_dob = '19540101'
     # %% XML encoding

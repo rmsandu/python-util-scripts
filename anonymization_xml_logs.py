@@ -5,8 +5,6 @@ Created on June 06th 2019
 @author: Raluca Sandu
 """
 import os
-import numpy as np
-import untangle as ut
 import xml.etree.ElementTree as ET
 
 

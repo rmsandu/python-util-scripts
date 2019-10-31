@@ -5,16 +5,17 @@ Created on June 06th 2019
 @author: Raluca Sandu
 """
 
+import argparse
 import os
 import sys
-import pydicom
-import argparse
-import pandas as pd
-from pydicom import uid
 from ast import literal_eval
-import pathlib
-from pydicom.sequence import Sequence
+
+import pandas as pd
+import pydicom
+from pydicom import uid
 from pydicom.dataset import Dataset
+from pydicom.sequence import Sequence
+
 import anonymization_xml_logs
 from extract_segm_paths_xml import create_tumour_ablation_mapping
 
@@ -110,7 +111,6 @@ def add_general_reference_segmentation(dataset_segm,
     dataset_segm.SegmentAlgorithmType = "SEMIAUTOMATIC"
     dataset_segm.DerivationDescription = "CasOneIR"
     dataset_segm.ImageType = "DERIVED\PRIMARY"
-
 
     Segm_ds = Dataset()
     Segm_ds.ReferencedSOPInstanceUID = ReferencedSeriesInstanceUID_segm
@@ -296,18 +296,21 @@ def main_add_reference_tags_dcm(rootdir, df_ct_mapping, df_segmentations_paths_x
                                                                   lesion_number)
                 dataset_segm.save_as(dcm_file)  # save to disk
 
-# %%
 
+# %%
 
 if __name__ == '__main__':
 
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--rootdir", required=False, help="input single patient folder path to be processed")
-    ap.add_argument("-n", "--patient_name", required=False, help="patient name to be encoded into the files. eg: MAVM03")
+    ap.add_argument("-n", "--patient_name", required=False,
+                    help="patient name to be encoded into the files. eg: MAVM03")
     ap.add_argument("-u", "--patient_id", required=False, help="patient id to be encoded into the files. eg: M03")
     ap.add_argument("-d", "--patient_dob", required=False, help="patient date of birth in format eg: 19380101")
-    ap.add_argument("-b", "--input_batch_proc", required=False, help="input Excel file for batch processing, eg: Batch_processing_MAVERRIC")
-    ap.add_argument("-a", '--anonymize_all_dcm_files', required=True, help='flag whether to anonymize all the dcm files or not')
+    ap.add_argument("-b", "--input_batch_proc", required=False,
+                    help="input Excel file for batch processing, eg: Batch_processing_MAVERRIC")
+    ap.add_argument("-a", '--anonymize_all_dcm_files', required=True,
+                    help='flag whether to anonymize all the dcm files or not')
     args = vars(ap.parse_args())
     if args["patient_name"] is not None:
         print("Patient Name:", args["patient_name"])
@@ -348,7 +351,8 @@ if __name__ == '__main__':
                     list_all_ct_series = create_dict_paths_series_dcm(rootdir)
                     df_ct_mapping = pd.DataFrame(list_all_ct_series)
                     # 3. XML encoding. rewrite the series and the name in the xml after re-writing the broken series uid
-                    anonymization_xml_logs.main_encode_xml(rootdir, patient_id, patient_name, patient_dob, df_ct_mapping)
+                    anonymization_xml_logs.main_encode_xml(rootdir, patient_id, patient_name, patient_dob,
+                                                           df_ct_mapping)
                     # 4. create dict of xml and dicom paths
                     df_segmentations_paths_xml = create_dict_paths_series_xml(rootdir)
                     # 5. Edit each DICOM Segmentation File  by adding reference Source CT and the related segmentation
@@ -381,10 +385,3 @@ if __name__ == '__main__':
             # Edit each DICOM Segmentation File  by adding reference Source CT and the related segmentation
             main_add_reference_tags_dcm(args["rootdir"], df_ct_mapping, df_segmentations_paths_xml)
             print("Patient Folder Segmentations Fixed:", args["patient_name"])
-
-
-
-
-
-
-
