@@ -31,5 +31,5 @@ six==1.12.0
 sysutils==0.0.2
 transformations==2019.4.22
 untangle==1.1.1
-urllib3==1.25.3
+urllib3==1.25.8
 yarg==0.1.9
